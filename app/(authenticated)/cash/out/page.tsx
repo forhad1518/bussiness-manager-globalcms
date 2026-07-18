@@ -13,8 +13,8 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { CardSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 
 interface CashTransaction {
   _id: string;
@@ -25,8 +25,14 @@ interface CashTransaction {
   createdAt: string;
 }
 
+interface Category {
+  _id: string;
+  name: string;
+}
+
 export default function CashOutPage() {
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -36,27 +42,35 @@ export default function CashOutPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
 
-  // কার্ড ডাটা
   const [profitAmount, setProfitAmount] = useState(0);
   const [todayInAmount, setTodayInAmount] = useState(0);
   const [totalInAmount, setTotalInAmount] = useState(0);
   const [todayOutAmount, setTodayOutAmount] = useState(0);
   const [totalOutAmount, setTotalOutAmount] = useState(0);
 
-  const fetchData = useCallback(async () => {
-    const params: any = { page, limit: 10, type: "out" };
-    if (search) params.search = search;
-    if (from) params.from = from;
-    if (to) params.to = to;
-    if (category) params.category = category;
-
+  const fetchCategories = useCallback(async () => {
     try {
+      const res = await axios.get("/api/cash-categories?type=out");
+      setCategories(res.data);
+    } catch {}
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = { page, limit: 10, type: "out" };
+      if (search) params.search = search;
+      if (from) params.from = from;
+      if (to) params.to = to;
+      if (category) params.category = category;
+
       const [listRes, inSummary, outSummary, profitRes] = await Promise.all([
         axios.get("/api/cash", { params }),
         axios.get("/api/cash?type=in&summary=1"),
         axios.get("/api/cash?type=out&summary=1"),
-        axios.get("/api/orders/profit"), // create this next
+        axios.get("/api/orders/profit"),
       ]);
 
       setTransactions(listRes.data.transactions);
@@ -66,27 +80,33 @@ export default function CashOutPage() {
       setTodayOutAmount(outSummary.data.todayTotal);
       setTotalOutAmount(outSummary.data.allTimeTotal);
       setProfitAmount(profitRes.data.profit ?? 0);
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch data");
+    } finally {
+      setLoading(false);
     }
   }, [page, search, from, to, category]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const totalAmount = profitAmount + totalInAmount; // Total Amount = Profit + Total Cash In
+  const totalAmount = profitAmount + totalInAmount;
 
-  // Delete, Edit handlers similar to Cash In (reuse same modal pattern)
   const handleDelete = async (id: string) => {
     if (!confirm("Delete?")) return;
-    await axios.delete(`/api/cash/${id}`);
-    toast.success("Deleted");
-    fetchData();
+    try {
+      await axios.delete(`/api/cash/${id}`);
+      toast.success("Deleted");
+      fetchData();
+    } catch {
+      toast.error("Delete failed");
+    }
   };
-
-  // Edit modal component similar to Cash In's EditCashModal; we can reuse by importing, but I'll keep inline for simplicity.
-  // I'll reuse the same EditCashModal component structure from CashInPage, but I'll copy here.
 
   const EditModal = ({ open, setOpen, txn, refresh }: any) => {
     const [form, setForm] = useState({ amount: "", description: "" });
@@ -99,13 +119,17 @@ export default function CashOutPage() {
     }, [txn]);
 
     const handleUpdate = async () => {
-      await axios.put(`/api/cash/${txn._id}`, {
-        amount: parseFloat(form.amount),
-        description: form.description,
-      });
-      toast.success("Updated");
-      setOpen(false);
-      refresh();
+      try {
+        await axios.put(`/api/cash/${txn._id}`, {
+          amount: parseFloat(form.amount),
+          description: form.description,
+        });
+        toast.success("Updated");
+        setOpen(false);
+        refresh();
+      } catch {
+        toast.error("Update failed");
+      }
     };
 
     return (
@@ -148,13 +172,13 @@ export default function CashOutPage() {
                 <div className="flex gap-2 justify-end">
                   <button
                     onClick={() => setOpen(false)}
-                    className="px-4 py-2 bg-gray-200 rounded-lg"
+                    className="px-4 py-2 bg-gray-200 rounded-lg cursor-pointer hover:bg-gray-300 transition"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleUpdate}
-                    className="px-4 py-2 bg-primary text-white rounded-lg"
+                    className="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-dark transition"
                   >
                     Save
                   </button>
@@ -173,39 +197,45 @@ export default function CashOutPage() {
         <h2 className="text-2xl font-bold">Cash Out</h2>
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark"
+          className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition cursor-pointer"
         >
           <Plus size={18} /> Add Cash Out
         </button>
       </div>
 
-      {/* Cards */}
-      <Fade cascade damping={0.1} triggerOnce>
+      {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-blue-500 text-white p-4 rounded-xl shadow">
-            <p className="text-sm">Profit Amount</p>
-            <p className="text-2xl font-bold">৳ {profitAmount}</p>
-          </div>
-          <div className="bg-green-500 text-white p-4 rounded-xl shadow">
-            <p className="text-sm">Today In</p>
-            <p className="text-2xl font-bold">৳ {todayInAmount}</p>
-          </div>
-          <div className="bg-purple-500 text-white p-4 rounded-xl shadow">
-            <p className="text-sm">Total Amount</p>
-            <p className="text-2xl font-bold">৳ {totalAmount}</p>
-          </div>
-          <div className="bg-red-500 text-white p-4 rounded-xl shadow">
-            <p className="text-sm">Total Out</p>
-            <p className="text-2xl font-bold">৳ {totalOutAmount}</p>
-          </div>
-          <div className="bg-orange-500 text-white p-4 rounded-xl shadow">
-            <p className="text-sm">Today Out</p>
-            <p className="text-2xl font-bold">৳ {todayOutAmount}</p>
-          </div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
-      </Fade>
+      ) : (
+        <Fade cascade damping={0.1} triggerOnce>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="bg-blue-500 text-white p-4 rounded-xl shadow">
+              <p className="text-sm">Profit Amount</p>
+              <p className="text-2xl font-bold">৳ {profitAmount}</p>
+            </div>
+            <div className="bg-green-500 text-white p-4 rounded-xl shadow">
+              <p className="text-sm">Today In</p>
+              <p className="text-2xl font-bold">৳ {todayInAmount}</p>
+            </div>
+            <div className="bg-purple-500 text-white p-4 rounded-xl shadow">
+              <p className="text-sm">Total Amount</p>
+              <p className="text-2xl font-bold">৳ {totalAmount}</p>
+            </div>
+            <div className="bg-red-500 text-white p-4 rounded-xl shadow">
+              <p className="text-sm">Total Out</p>
+              <p className="text-2xl font-bold">৳ {totalOutAmount}</p>
+            </div>
+            <div className="bg-orange-500 text-white p-4 rounded-xl shadow">
+              <p className="text-sm">Today Out</p>
+              <p className="text-2xl font-bold">৳ {todayOutAmount}</p>
+            </div>
+          </div>
+        </Fade>
+      )}
 
-      {/* Filters (same as Cash In) */}
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-50">
           <Search
@@ -227,76 +257,89 @@ export default function CashOutPage() {
           type="date"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border rounded-lg cursor-pointer"
         />
         <input
           type="date"
           value={to}
           onChange={(e) => setTo(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border rounded-lg cursor-pointer"
         />
         <select
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          onChange={(e) => {
+            setCategory(e.target.value);
+            setPage(1);
+          }}
+          className="px-3 py-2 border rounded-lg cursor-pointer"
         >
           <option value="">All Categories</option>
+          {categories.map((cat) => (
+            <option key={cat._id} value={cat._id}>
+              {cat.name}
+            </option>
+          ))}
         </select>
       </div>
 
-      {/* Table */}
-      <Fade direction="up" triggerOnce>
-        <div className="overflow-x-auto bg-white rounded-2xl shadow">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="p-3 text-left">Date</th>
-                <th className="p-3 text-left">Category</th>
-                <th className="p-3 text-left">Amount</th>
-                <th className="p-3 text-left">Description</th>
-                <th className="p-3 text-left">User</th>
-                <th className="p-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((txn) => (
-                <tr key={txn._id} className="border-b hover:bg-gray-50">
-                  <td className="p-3">
-                    {format(new Date(txn.createdAt), "dd/MM/yyyy HH:mm")}
-                  </td>
-                  <td className="p-3">{txn.categoryId?.name || "-"}</td>
-                  <td className="p-3 font-semibold text-red-600">
-                    ৳ {txn.amount}
-                  </td>
-                  <td className="p-3 max-w-50 truncate">
-                    {txn.description || "-"}
-                  </td>
-                  <td className="p-3">{txn.user?.name || "-"}</td>
-                  <td className="p-3 flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedTxn(txn);
-                        setEditModal(true);
-                      }}
-                      className="text-blue-600"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(txn._id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+      {loading ? (
+        <TableSkeleton rows={4} cols={6} />
+      ) : (
+        <Fade direction="up" triggerOnce>
+          <div className="overflow-x-auto bg-white rounded-2xl shadow">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-left">Category</th>
+                  <th className="p-3 text-left">Amount</th>
+                  <th className="p-3 text-left">Description</th>
+                  <th className="p-3 text-left">User</th>
+                  <th className="p-3 text-left">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Fade>
+              </thead>
+              <tbody>
+                {transactions.map((txn) => (
+                  <tr
+                    key={txn._id}
+                    className="border-b hover:bg-gray-50 transition cursor-pointer"
+                  >
+                    <td className="p-3">
+                      {format(new Date(txn.createdAt), "dd/MM/yyyy HH:mm")}
+                    </td>
+                    <td className="p-3">{txn.categoryId?.name || "-"}</td>
+                    <td className="p-3 font-semibold text-red-600">
+                      ৳ {txn.amount}
+                    </td>
+                    <td className="p-3 max-w-50 truncate">
+                      {txn.description || "-"}
+                    </td>
+                    <td className="p-3">{txn.user?.name || "-"}</td>
+                    <td className="p-3 flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedTxn(txn);
+                          setEditModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(txn._id)}
+                        className="text-red-600 hover:text-red-800 cursor-pointer"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Fade>
+      )}
 
-      {/* Pagination */}
       <div className="flex items-center justify-between mt-4">
         <span className="text-sm text-gray-600">
           Page {page} of {totalPages}
@@ -305,28 +348,26 @@ export default function CashOutPage() {
           <button
             disabled={page <= 1}
             onClick={() => setPage(page - 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50"
+            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             disabled={page >= totalPages}
             onClick={() => setPage(page + 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50"
+            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
           >
             <ChevronRight size={18} />
           </button>
         </div>
       </div>
 
-      {/* Add Cash Out Drawer */}
       <AddCashDrawer
         open={drawerOpen}
         setOpen={setDrawerOpen}
         refresh={fetchData}
         type="out"
       />
-      {/* Edit Modal */}
       <EditModal
         open={editModal}
         setOpen={setEditModal}
@@ -337,7 +378,7 @@ export default function CashOutPage() {
   );
 }
 
-// Reuse the same AddCashDrawer component (import or duplicate)
+// ---------- AddCashDrawer (repeated for completeness) ----------
 function AddCashDrawer({
   open,
   setOpen,
@@ -408,7 +449,10 @@ function AddCashDrawer({
               <h2 className="text-xl font-bold">
                 Add Cash {type === "in" ? "In" : "Out"}
               </h2>
-              <button onClick={() => setOpen(false)}>
+              <button
+                onClick={() => setOpen(false)}
+                className="hover:bg-gray-100 p-1 rounded"
+              >
                 <X size={24} />
               </button>
             </div>
@@ -418,7 +462,7 @@ function AddCashDrawer({
                 onChange={(e) =>
                   setForm({ ...form, categoryId: e.target.value })
                 }
-                className="w-full px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-lg cursor-pointer"
                 required
               >
                 <option value="">Select Category</option>
@@ -447,7 +491,7 @@ function AddCashDrawer({
               />
               <button
                 type="submit"
-                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition"
+                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition cursor-pointer"
               >
                 Add
               </button>

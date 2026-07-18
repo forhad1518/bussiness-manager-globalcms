@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { Fade } from "react-awesome-reveal";
 import {
@@ -14,6 +14,8 @@ import {
   Line,
   CartesianGrid,
 } from "recharts";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const monthNames = [
   "Jan",
@@ -32,15 +34,50 @@ const monthNames = [
 
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const res = await axios.get("/api/dashboard");
+      setData(res.data);
+    } catch {
+      // keep old data
+    } finally {
+      setInitialLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    axios.get("/api/dashboard").then((res) => setData(res.data));
-  }, []);
+    fetchDashboard();
+    const interval = setInterval(fetchDashboard, 60000);
+    return () => clearInterval(interval);
+  }, [fetchDashboard]);
+
+  if (initialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+        <div className="bg-white p-4 rounded-2xl shadow">
+          <Skeleton className="h-64 w-full" />
+        </div>
+        <div className="bg-white p-4 rounded-2xl shadow">
+          <Skeleton className="h-64 w-full" />
+        </div>
+        <div className="bg-white p-4 rounded-2xl shadow">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   if (!data)
     return (
       <div className="flex items-center justify-center h-full">
-        <p>Loading dashboard...</p>
+        <p>Error loading dashboard.</p>
       </div>
     );
 
@@ -51,7 +88,6 @@ export default function DashboardPage() {
     { name: "Yesterday", In: yesterday.in, Out: yesterday.out },
   ];
 
-  // Format yearly for chart (year as string)
   const yearlyChart = yearly.map((y: any) => ({
     name: y.year.toString(),
     In: y.in,
@@ -60,7 +96,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Cards */}
       <Fade cascade damping={0.1} triggerOnce>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
@@ -106,7 +141,6 @@ export default function DashboardPage() {
         </div>
       </Fade>
 
-      {/* Today vs Yesterday */}
       <div className="bg-white p-4 rounded-2xl shadow">
         <h3 className="text-lg font-semibold mb-4">
           Today vs Yesterday In/Out
@@ -124,7 +158,6 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* This Month Daily */}
       <div className="bg-white p-4 rounded-2xl shadow">
         <h3 className="text-lg font-semibold mb-4">This Month In/Out</h3>
         <ResponsiveContainer width="100%" height={300}>
@@ -140,7 +173,6 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* Yearly Monthly */}
       <div className="bg-white p-4 rounded-2xl shadow">
         <h3 className="text-lg font-semibold mb-4">
           Yearly In/Out ({new Date().getFullYear()})
@@ -163,7 +195,6 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* Multi-year */}
       <div className="bg-white p-4 rounded-2xl shadow">
         <h3 className="text-lg font-semibold mb-4">Multi-Year In/Out</h3>
         <ResponsiveContainer width="100%" height={300}>

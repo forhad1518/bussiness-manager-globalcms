@@ -24,24 +24,30 @@ export default function TopBar({
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // প্রতি ৩০ সেকেন্ডে
+    const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
   const handleMarkRead = async (
     id: string,
-    relatedId?: string,
     type?: string,
+    message?: string,
   ) => {
-    await axios.patch(`/api/notifications/${id}/read`);
-    setNotifications((prev) => prev.filter((n) => n._id !== id));
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-    // Navigate
-    if (type?.includes("order")) {
-      router.push(`/orders`);
-    } else if (type?.includes("client")) {
-      router.push(`/clients`);
-    }
+    try {
+      await axios.patch(`/api/notifications/${id}/read`);
+      setNotifications((prev) => prev.filter((n) => n._id !== id));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
+      // Navigate based on type
+      if (type?.startsWith("order")) {
+        const match = message?.match(/ORD-\d+/);
+        if (match) router.push(`/orders?search=${match[0]}`);
+        else router.push("/orders");
+      } else if (type?.startsWith("client")) {
+        router.push("/clients");
+      }
+      setShowDropdown(false);
+    } catch {}
   };
 
   const handleLogout = async () => {
@@ -81,13 +87,7 @@ export default function TopBar({
                 notifications.map((n) => (
                   <div
                     key={n._id}
-                    onClick={() =>
-                      handleMarkRead(
-                        n._id,
-                        n.relatedOrder || n.relatedClient,
-                        n.type,
-                      )
-                    }
+                    onClick={() => handleMarkRead(n._id, n.type, n.message)}
                     className="p-3 hover:bg-gray-50 cursor-pointer border-b"
                   >
                     <p className="font-medium text-sm">{n.title}</p>

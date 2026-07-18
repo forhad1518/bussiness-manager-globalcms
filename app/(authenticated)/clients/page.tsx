@@ -17,8 +17,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { TableSkeleton } from "@/components/ui/Skeleton";
 
-// ========== Types ==========
+// Types
 interface Client {
   _id: string;
   name: string;
@@ -33,16 +34,7 @@ interface Client {
   updatedAt: string;
 }
 
-interface Transaction {
-  _id: string;
-  type: string;
-  amount: number;
-  description: string;
-  createdBy?: { name: string };
-  createdAt: string;
-}
-
-// ========== Card Component ==========
+// ---------- Card Section ----------
 function ClientCards({ summary }: { summary: any }) {
   const cards = [
     {
@@ -85,7 +77,7 @@ function ClientCards({ summary }: { summary: any }) {
   );
 }
 
-// ========== Add Client Drawer ==========
+// ---------- Add Client Drawer ----------
 function AddClientDrawer({
   open,
   setOpen,
@@ -146,7 +138,10 @@ function AddClientDrawer({
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Add Client</h2>
-              <button onClick={() => setOpen(false)}>
+              <button
+                onClick={() => setOpen(false)}
+                className="hover:bg-gray-100 p-1 rounded"
+              >
                 <X size={24} />
               </button>
             </div>
@@ -192,7 +187,7 @@ function AddClientDrawer({
               />
               <button
                 type="submit"
-                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition"
+                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition cursor-pointer"
               >
                 Add Client
               </button>
@@ -204,7 +199,7 @@ function AddClientDrawer({
   );
 }
 
-// ========== Edit Mobile Modal ==========
+// ---------- Edit Mobile Modal ----------
 function EditMobileModal({
   open,
   setOpen,
@@ -271,8 +266,10 @@ function EditMobileModal({
                 <button
                   onClick={() => setType("mobile")}
                   className={cn(
-                    "px-3 py-1 rounded",
-                    type === "mobile" ? "bg-primary text-white" : "bg-gray-200",
+                    "px-3 py-1 rounded cursor-pointer transition",
+                    type === "mobile"
+                      ? "bg-primary text-white"
+                      : "bg-gray-200 hover:bg-gray-300",
                   )}
                 >
                   Primary
@@ -280,10 +277,10 @@ function EditMobileModal({
                 <button
                   onClick={() => setType("secondary")}
                   className={cn(
-                    "px-3 py-1 rounded",
+                    "px-3 py-1 rounded cursor-pointer transition",
                     type === "secondary"
                       ? "bg-primary text-white"
-                      : "bg-gray-200",
+                      : "bg-gray-200 hover:bg-gray-300",
                   )}
                 >
                   Secondary
@@ -302,13 +299,13 @@ function EditMobileModal({
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setOpen(false)}
-                  className="px-4 py-2 bg-gray-200 rounded-lg"
+                  className="px-4 py-2 bg-gray-200 rounded-lg cursor-pointer hover:bg-gray-300 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 bg-primary text-white rounded-lg"
+                  className="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-dark transition"
                 >
                   Save
                 </button>
@@ -321,7 +318,7 @@ function EditMobileModal({
   );
 }
 
-// ========== View Logs Modal ==========
+// ---------- View Logs Modal ----------
 function ViewLogsModal({
   open,
   setOpen,
@@ -331,7 +328,7 @@ function ViewLogsModal({
   setOpen: (v: boolean) => void;
   clientId: string | null;
 }) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -375,7 +372,10 @@ function ViewLogsModal({
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Client Logs</h3>
-                <button onClick={() => setOpen(false)}>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="hover:bg-gray-100 p-1 rounded"
+                >
                   <X size={24} />
                 </button>
               </div>
@@ -394,7 +394,7 @@ function ViewLogsModal({
                 />
                 <button
                   onClick={fetchLogs}
-                  className="bg-primary text-white px-4 py-2 rounded"
+                  className="bg-primary text-white px-4 py-2 rounded cursor-pointer hover:bg-primary-dark transition"
                 >
                   Filter
                 </button>
@@ -411,7 +411,10 @@ function ViewLogsModal({
                 </thead>
                 <tbody>
                   {transactions.map((t) => (
-                    <tr key={t._id} className="border-b">
+                    <tr
+                      key={t._id}
+                      className="border-b hover:bg-gray-50 transition cursor-pointer"
+                    >
                       <td className="p-2">
                         {format(new Date(t.createdAt), "dd/MM/yyyy")}
                       </td>
@@ -435,10 +438,136 @@ function ViewLogsModal({
   );
 }
 
-// ========== Main Clients Page ==========
+// ---------- Pay Row (improved) ----------
+function PayRow({
+  client,
+  onPay,
+  onTerminate,
+  onEditMobile,
+  onViewLogs,
+}: {
+  client: Client;
+  onPay: (id: string, amount: number) => void;
+  onTerminate: (client: Client) => void;
+  onEditMobile: () => void;
+  onViewLogs: () => void;
+}) {
+  const [payInput, setPayInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showDueDate, setShowDueDate] = useState(false);
+  const [nextDueDate, setNextDueDate] = useState("");
+
+  const handlePay = async () => {
+    const amount = parseFloat(payInput);
+    if (!amount || amount <= 0) return toast.error("Enter valid amount");
+    setLoading(true);
+    try {
+      const payload: any = { action: "pay", amount };
+      if (showDueDate && nextDueDate) {
+        payload.nextDueDate = nextDueDate;
+      }
+      await axios.patch(`/api/clients/${client._id}`, payload);
+      toast.success(`Paid ৳${amount}`);
+      setPayInput("");
+      setNextDueDate("");
+      setShowDueDate(false);
+      onPay(client._id, amount);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Payment failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const remainingDue = client.dueAmount - parseFloat(payInput || "0");
+
+  return (
+    <tr className="border-b hover:bg-gray-50 transition cursor-pointer">
+      <td className="p-3 font-mono text-xs">{client._id.slice(-6)}</td>
+      <td className="p-3">{format(new Date(client.createdAt), "dd/MM/yy")}</td>
+      <td className="p-3 font-medium">{client.name}</td>
+      <td className="p-3">{client.fatherName || "-"}</td>
+      <td className="p-3">
+        <div className="flex items-center gap-1">
+          <span>{client.mobile}</span>
+          <button
+            onClick={onEditMobile}
+            className="text-blue-500 hover:text-blue-700 cursor-pointer"
+          >
+            <Pencil size={14} />
+          </button>
+        </div>
+        {client.secondaryMobile && (
+          <div className="text-xs text-gray-500">{client.secondaryMobile}</div>
+        )}
+      </td>
+      <td className="p-3 max-w-37.5 truncate">{client.address || "-"}</td>
+      <td className="p-3 font-semibold text-red-600">৳ {client.dueAmount}</td>
+      <td className="p-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min="0"
+              placeholder="Amount"
+              value={payInput}
+              onChange={(e) => setPayInput(e.target.value)}
+              className="w-20 px-2 py-1 border rounded text-sm"
+              disabled={loading}
+            />
+            <button
+              onClick={handlePay}
+              disabled={loading}
+              className="bg-green-500 text-white p-1 rounded hover:bg-green-600 transition disabled:opacity-50 cursor-pointer"
+            >
+              {loading ? "..." : <DollarSign size={14} />}
+            </button>
+          </div>
+          {parseFloat(payInput) > 0 && remainingDue > 0 && (
+            <div className="flex items-center gap-1 text-xs">
+              <input
+                type="date"
+                value={nextDueDate}
+                onChange={(e) => {
+                  setNextDueDate(e.target.value);
+                  setShowDueDate(true);
+                }}
+                className="border rounded px-1 py-0.5 w-28"
+              />
+              <span className="text-gray-500">Next due date</span>
+            </div>
+          )}
+        </div>
+      </td>
+      <td className="p-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onViewLogs}
+            className="text-blue-600 hover:text-blue-800 cursor-pointer"
+            title="View Logs"
+          >
+            <Eye size={18} />
+          </button>
+          {client.status === "active" && (
+            <button
+              onClick={() => onTerminate(client)}
+              className="text-red-500 hover:text-red-700 cursor-pointer"
+              title="Terminate"
+            >
+              <Ban size={18} />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ---------- Main Clients Page ----------
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [summary, setSummary] = useState<any>({});
+  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editMobileOpen, setEditMobileOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -452,39 +581,33 @@ export default function ClientsPage() {
   const limit = 10;
 
   const fetchClients = useCallback(async () => {
-    const params: any = { page, limit };
-    if (search) params.search = search;
-    if (statusFilter) params.status = statusFilter;
+    setLoading(true);
+    try {
+      const params: any = { page, limit };
+      if (search) params.search = search;
+      if (statusFilter) params.status = statusFilter;
 
-    const [listRes, summaryRes] = await Promise.all([
-      axios.get("/api/clients", { params }),
-      axios.get("/api/clients?summary=1"),
-    ]);
-    setClients(listRes.data.clients);
-    setTotalPages(listRes.data.pagination.totalPages);
-    setSummary(summaryRes.data);
+      const [listRes, summaryRes] = await Promise.all([
+        axios.get("/api/clients", { params }),
+        axios.get("/api/clients?summary=1"),
+      ]);
+      setClients(listRes.data.clients);
+      setTotalPages(listRes.data.pagination.totalPages);
+      setSummary(summaryRes.data);
+    } catch (err) {
+      toast.error("Failed to load clients");
+    } finally {
+      setLoading(false);
+    }
   }, [page, search, statusFilter]);
 
   useEffect(() => {
     fetchClients();
   }, [fetchClients]);
 
-  const handlePay = async (clientId: string, amount: number) => {
-    if (amount <= 0) {
-      toast.error("Enter a valid amount");
-      return;
-    }
-    try {
-      const res = await axios.patch(`/api/clients/${clientId}`, {
-        action: "pay",
-        amount,
-        description: `Payment of ${amount} TK`,
-      });
-      toast.success(`Paid ৳${amount}`);
-      fetchClients();
-    } catch {
-      toast.error("Payment failed");
-    }
+  const handlePay = (clientId: string, amount: number) => {
+    // Refresh list after payment (already handled in PayRow via onPay prop)
+    fetchClients();
   };
 
   const handleTerminate = async (client: Client) => {
@@ -504,7 +627,7 @@ export default function ClientsPage() {
         <h2 className="text-2xl font-bold">Clients</h2>
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition"
+          className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition cursor-pointer"
         >
           <Plus size={18} /> Add Client
         </button>
@@ -537,7 +660,7 @@ export default function ClientsPage() {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border rounded-lg cursor-pointer"
         >
           <option value="">All Status</option>
           <option value="active">Active</option>
@@ -545,44 +668,48 @@ export default function ClientsPage() {
         </select>
       </div>
 
-      {/* Table */}
-      <Slide direction="up" triggerOnce>
-        <div className="overflow-x-auto bg-white rounded-2xl shadow">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="p-3 text-left">ID</th>
-                <th className="p-3 text-left">Date</th>
-                <th className="p-3 text-left">Name</th>
-                <th className="p-3 text-left">Father</th>
-                <th className="p-3 text-left">Mobile</th>
-                <th className="p-3 text-left">Address</th>
-                <th className="p-3 text-left">Due</th>
-                <th className="p-3 text-left">Pay</th>
-                <th className="p-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((client) => (
-                <PayRow
-                  key={client._id}
-                  client={client}
-                  onPay={handlePay}
-                  onTerminate={handleTerminate}
-                  onEditMobile={() => {
-                    setSelectedClient(client);
-                    setEditMobileOpen(true);
-                  }}
-                  onViewLogs={() => {
-                    setLogsClientId(client._id);
-                    setLogsOpen(true);
-                  }}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Slide>
+      {/* Table or Skeleton */}
+      {loading ? (
+        <TableSkeleton rows={5} cols={9} />
+      ) : (
+        <Slide direction="up" triggerOnce>
+          <div className="overflow-x-auto bg-white rounded-2xl shadow">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-3 text-left">ID</th>
+                  <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-left">Name</th>
+                  <th className="p-3 text-left">Father</th>
+                  <th className="p-3 text-left">Mobile</th>
+                  <th className="p-3 text-left">Address</th>
+                  <th className="p-3 text-left">Due</th>
+                  <th className="p-3 text-left">Pay</th>
+                  <th className="p-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clients.map((client) => (
+                  <PayRow
+                    key={client._id}
+                    client={client}
+                    onPay={handlePay}
+                    onTerminate={handleTerminate}
+                    onEditMobile={() => {
+                      setSelectedClient(client);
+                      setEditMobileOpen(true);
+                    }}
+                    onViewLogs={() => {
+                      setLogsClientId(client._id);
+                      setLogsOpen(true);
+                    }}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Slide>
+      )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between mt-4">
@@ -593,21 +720,20 @@ export default function ClientsPage() {
           <button
             disabled={page <= 1}
             onClick={() => setPage(page - 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50"
+            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             disabled={page >= totalPages}
             onClick={() => setPage(page + 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50"
+            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
           >
             <ChevronRight size={18} />
           </button>
         </div>
       </div>
 
-      {/* Drawer & Modals */}
       <AddClientDrawer
         open={drawerOpen}
         setOpen={setDrawerOpen}
@@ -625,85 +751,5 @@ export default function ClientsPage() {
         clientId={logsClientId}
       />
     </div>
-  );
-}
-
-// ========== Single Table Row with Pay Input ==========
-function PayRow({
-  client,
-  onPay,
-  onTerminate,
-  onEditMobile,
-  onViewLogs,
-}: {
-  client: Client;
-  onPay: (id: string, amount: number) => void;
-  onTerminate: (client: Client) => void;
-  onEditMobile: () => void;
-  onViewLogs: () => void;
-}) {
-  const [payInput, setPayInput] = useState("");
-
-  return (
-    <tr className="border-b hover:bg-gray-50 transition">
-      <td className="p-3 font-mono text-xs">{client._id.slice(-6)}</td>
-      <td className="p-3">{format(new Date(client.createdAt), "dd/MM/yy")}</td>
-      <td className="p-3 font-medium">{client.name}</td>
-      <td className="p-3">{client.fatherName || "-"}</td>
-      <td className="p-3">
-        <div className="flex items-center gap-1">
-          <span>{client.mobile}</span>
-          <button onClick={onEditMobile} className="text-blue-500">
-            <Pencil size={14} />
-          </button>
-        </div>
-        {client.secondaryMobile && (
-          <div className="text-xs text-gray-500">{client.secondaryMobile}</div>
-        )}
-      </td>
-      <td className="p-3 max-w-37.5 truncate">{client.address || "-"}</td>
-      <td className="p-3 font-semibold text-error">৳ {client.dueAmount}</td>
-      <td className="p-3">
-        <div className="flex items-center gap-1">
-          <input
-            type="number"
-            min="0"
-            placeholder="Amount"
-            value={payInput}
-            onChange={(e) => setPayInput(e.target.value)}
-            className="w-20 px-2 py-1 border rounded text-sm"
-          />
-          <button
-            onClick={() => {
-              onPay(client._id, Number(payInput));
-              setPayInput("");
-            }}
-            className="bg-green-500 text-white p-1 rounded"
-          >
-            <DollarSign size={14} />
-          </button>
-        </div>
-      </td>
-      <td className="p-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onViewLogs}
-            className="text-blue-600 hover:text-blue-800"
-            title="View Logs"
-          >
-            <Eye size={18} />
-          </button>
-          {client.status === "active" && (
-            <button
-              onClick={() => onTerminate(client)}
-              className="text-red-500 hover:text-red-700"
-              title="Terminate"
-            >
-              <Ban size={18} />
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
   );
 }

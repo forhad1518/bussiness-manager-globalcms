@@ -4,6 +4,7 @@ import Order from "@/models/Order";
 import Client from "@/models/Client";
 import ClientTransaction from "@/models/ClientTransaction";
 import { getAuthUser } from "@/lib/auth";
+import mongoose from "mongoose";
 
 export async function POST(
   req: NextRequest,
@@ -27,7 +28,7 @@ export async function POST(
     status: "successful",
     cause: "",
     changedAt: new Date(),
-    changedBy: user.userId,
+    changedBy: new mongoose.Types.ObjectId(user.userId),
   });
 
   order.successData = {
@@ -53,7 +54,7 @@ export async function POST(
       amount: due,
       referenceOrder: order._id,
       description: `Due from order ${order.uniqueId}`,
-      createdBy: user.userId,
+      createdBy: new mongoose.Types.ObjectId(user.userId),
     });
   }
 

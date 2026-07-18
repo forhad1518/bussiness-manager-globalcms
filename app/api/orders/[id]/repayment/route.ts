@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/dbConnect";
 import Order from "@/models/Order";
 import { getAuthUser } from "@/lib/auth";
+import { Types } from "mongoose";
 
 export async function POST(
   req: NextRequest,
@@ -28,7 +29,7 @@ export async function POST(
     method,
     description: description || "",
     addedAt: new Date(),
-    addedBy: user.userId,
+    addedBy: new Types.ObjectId(user.userId),
   });
   await order.save();
   return NextResponse.json(order);

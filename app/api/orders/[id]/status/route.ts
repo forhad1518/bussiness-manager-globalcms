@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/dbConnect";
 import Order from "@/models/Order";
+import { Types } from "mongoose";
 import { getAuthUser } from "@/lib/auth";
 
 export async function PATCH(
@@ -46,7 +47,7 @@ export async function PATCH(
     status,
     cause: cause || "",
     changedAt: new Date(),
-    changedBy: user.userId,
+    changedBy: new Types.ObjectId(user.userId),
   });
   order.status = status;
   await order.save();

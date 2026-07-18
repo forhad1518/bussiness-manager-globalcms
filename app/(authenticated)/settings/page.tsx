@@ -1,9 +1,23 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { motion } from "framer-motion";
-import { Save, Plus, X, GripVertical, Trash2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Fade } from "react-awesome-reveal";
 import toast from "react-hot-toast";
+import {
+  Save,
+  Plus,
+  X,
+  GripVertical,
+  Trash2,
+  AlertTriangle,
+  CheckCircle,
+  UserPlus,
+  Key,
+  Edit,
+  RotateCcw,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   DndContext,
   closestCenter,
@@ -21,9 +35,79 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { cn } from "@/lib/utils";
 
-// ---------- Print Heading Form ----------
+// ==================== Confirm Modal ====================
+function ConfirmModal({
+  open,
+  setOpen,
+  title,
+  message,
+  onConfirm,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className="fixed inset-0 bg-black/60 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+          />
+          <motion.div
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="text-red-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+                  <p className="text-sm text-gray-600 mt-1">{message}</p>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setOpen(false)}
+                  className="px-6 py-2.5 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onConfirm();
+                    setOpen(false);
+                  }}
+                  className="px-6 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-xl transition cursor-pointer"
+                >
+                  Confirm
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ==================== Print Heading ====================
 function PrintHeadingForm() {
   const [form, setForm] = useState({
     storeName: "",
@@ -44,69 +128,86 @@ function PrintHeadingForm() {
     setLoading(true);
     try {
       await axios.put("/api/settings", form);
-      toast.success("Print heading saved");
+      toast.success("Print heading saved!");
     } catch {
-      toast.error("Save failed");
+      toast.error("Failed to save");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Print Heading</h3>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <div className="h-10 w-10 rounded-xl bg-linear-to-br from-primary to-primary-dark flex items-center justify-center">
+          <Save size={20} className="text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Print Heading</h3>
+          <p className="text-sm text-gray-500">
+            Customize your document header
+          </p>
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input
           type="text"
           placeholder="Store Name"
           value={form.storeName}
           onChange={(e) => setForm({ ...form, storeName: e.target.value })}
-          className="px-3 py-2 border rounded-lg"
+          className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition"
         />
         <input
           type="text"
           placeholder="Store Address"
           value={form.storeAddress}
           onChange={(e) => setForm({ ...form, storeAddress: e.target.value })}
-          className="px-3 py-2 border rounded-lg"
+          className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition"
         />
         <input
           type="text"
           placeholder="Proprietor Name"
           value={form.proprietorName}
           onChange={(e) => setForm({ ...form, proprietorName: e.target.value })}
-          className="px-3 py-2 border rounded-lg"
+          className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition"
         />
         <input
           type="text"
           placeholder="Mobile"
           value={form.mobile}
           onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-          className="px-3 py-2 border rounded-lg"
+          className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition"
         />
         <input
           type="text"
           placeholder="Watermark Text"
           value={form.watermark}
           onChange={(e) => setForm({ ...form, watermark: e.target.value })}
-          className="px-3 py-2 border rounded-lg md:col-span-2"
+          className="px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition md:col-span-2"
         />
       </div>
-      <button
-        onClick={handleSave}
-        disabled={loading}
-        className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition"
-      >
-        <Save size={16} /> Save
-      </button>
-    </div>
+      <div className="mt-6 flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={loading}
+          className="flex items-center gap-2 bg-linear-to-r from-primary to-primary-dark text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+        >
+          <Save size={18} /> {loading ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
-// ---------- Cash Categories ----------
+// ==================== Cash Categories ====================
 function CashCategories({ type }: { type: "in" | "out" }) {
   const [categories, setCategories] = useState<any[]>([]);
   const [input, setInput] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const fetchCategories = useCallback(async () => {
     const res = await axios.get(`/api/cash-categories?type=${type}`);
@@ -123,7 +224,9 @@ function CashCategories({ type }: { type: "in" | "out" }) {
         await axios.post("/api/cash-categories", { name: input.trim(), type });
         setInput("");
         fetchCategories();
-        toast.success("Category added");
+        toast.success(
+          `${type === "in" ? "Cash In" : "Cash Out"} category added`,
+        );
       } catch {
         toast.error("Failed to add");
       }
@@ -131,47 +234,77 @@ function CashCategories({ type }: { type: "in" | "out" }) {
   };
 
   const deleteCategory = async (id: string) => {
-    if (!confirm("Delete this category?")) return;
     try {
       await axios.delete(`/api/cash-categories/${id}`);
       fetchCategories();
-      toast.success("Deleted");
+      toast.success("Category deleted");
     } catch {
       toast.error("Failed to delete");
     }
   };
 
   return (
-    <div>
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 h-full">
+      <div className="flex items-center gap-3 mb-6">
+        <div
+          className={cn(
+            "h-10 w-10 rounded-xl flex items-center justify-center",
+            type === "in"
+              ? "bg-linear-to-br from-green-500 to-green-600"
+              : "bg-linear-to-br from-red-500 to-red-600",
+          )}
+        >
+          {type === "in" ? (
+            <Plus size={20} className="text-white" />
+          ) : (
+            <Trash2 size={20} className="text-white" />
+          )}
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">
+            Cash {type === "in" ? "In" : "Out"} Categories
+          </h3>
+          <p className="text-sm text-gray-500">Press Enter to add</p>
+        </div>
+      </div>
       <input
         type="text"
-        placeholder={`Add ${type === "in" ? "Cash In" : "Cash Out"} category...`}
+        placeholder={`Add ${type === "in" ? "in" : "out"} category...`}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={addCategory}
-        className="w-full px-3 py-2 border rounded-lg mb-3"
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition mb-4"
       />
-      <ul className="space-y-2">
+      <ul className="space-y-2 max-h-64 overflow-y-auto">
         {categories.map((cat) => (
-          <li
+          <motion.li
             key={cat._id}
-            className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg group"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="group flex items-center justify-between bg-gray-50 px-4 py-3 rounded-xl hover:bg-gray-100 transition cursor-pointer"
           >
-            <span>{cat.name}</span>
+            <span className="text-gray-800 font-medium">{cat.name}</span>
             <button
-              onClick={() => deleteCategory(cat._id)}
-              className="text-error opacity-0 group-hover:opacity-100 transition"
+              onClick={() => setConfirmDelete(cat._id)}
+              className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
             >
               <Trash2 size={16} />
             </button>
-          </li>
+          </motion.li>
         ))}
       </ul>
+      <ConfirmModal
+        open={!!confirmDelete}
+        setOpen={() => setConfirmDelete(null)}
+        title="Delete Category"
+        message="Are you sure you want to delete this category? This action cannot be undone."
+        onConfirm={() => confirmDelete && deleteCategory(confirmDelete)}
+      />
     </div>
   );
 }
 
-// ---------- Sortable Process Step ----------
+// ==================== Sortable Step ====================
 function SortableStep({
   step,
   onDelete,
@@ -181,35 +314,43 @@ function SortableStep({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: step });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center justify-between bg-white border px-3 py-2 rounded-lg"
+      className="flex items-center justify-between bg-white border border-gray-200 px-4 py-3 rounded-xl shadow-sm"
     >
-      <div className="flex items-center gap-2">
-        <button {...attributes} {...listeners} className="cursor-grab">
-          <GripVertical size={16} className="text-gray-400" />
+      <div className="flex items-center gap-3">
+        <button
+          {...attributes}
+          {...listeners}
+          className="active:cursor-grabbing text-gray-400 hover:text-primary transition"
+        >
+          <GripVertical size={18} />
         </button>
-        <span>{step}</span>
+        <span className="text-gray-800 font-medium">{step}</span>
       </div>
-      <button onClick={onDelete} className="text-error">
-        <X size={16} />
+      <button
+        onClick={onDelete}
+        className="text-gray-400 hover:text-red-500 transition cursor-pointer"
+      >
+        <X size={18} />
       </button>
     </div>
   );
 }
 
-// ---------- Order Options ----------
+// ==================== Order Options ====================
 function OrderOptionsSection() {
   const [options, setOptions] = useState<any[]>([]);
   const [newOption, setNewOption] = useState("");
   const [processInputs, setProcessInputs] = useState<Record<string, string>>(
     {},
+  );
+  const [confirmDeleteOption, setConfirmDeleteOption] = useState<string | null>(
+    null,
   );
 
   const fetchOptions = useCallback(async () => {
@@ -262,6 +403,7 @@ function OrderOptionsSection() {
         processSteps: updatedSteps,
       });
       fetchOptions();
+      toast.success("Step removed");
     } catch {
       toast.error("Failed to remove step");
     }
@@ -280,17 +422,17 @@ function OrderOptionsSection() {
         processSteps: newSteps,
       });
       fetchOptions();
+      toast.success("Reordered");
     } catch {
       toast.error("Reorder failed");
     }
   };
 
   const deleteOption = async (id: string) => {
-    if (!confirm("Delete this order type?")) return;
     try {
       await axios.delete(`/api/order-options/${id}`);
       fetchOptions();
-      toast.success("Deleted");
+      toast.success("Order type deleted");
     } catch {
       toast.error("Failed");
     }
@@ -304,85 +446,122 @@ function OrderOptionsSection() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex gap-2">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <div className="h-10 w-10 rounded-xl bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+          <GripVertical size={20} className="text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Order Options</h3>
+          <p className="text-sm text-gray-500">
+            Manage order types & process steps
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 mb-6">
         <input
           type="text"
           placeholder="New order type"
           value={newOption}
           onChange={(e) => setNewOption(e.target.value)}
-          className="flex-1 px-3 py-2 border rounded-lg"
+          onKeyDown={(e) => e.key === "Enter" && addOption()}
+          className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition"
         />
         <button
           onClick={addOption}
-          className="bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark"
+          className="bg-linear-to-r from-primary to-primary-dark text-white px-5 py-3 rounded-xl hover:shadow-lg transition-all cursor-pointer"
         >
-          <Plus size={16} />
+          <Plus size={20} />
         </button>
       </div>
-      {options.map((option) => (
-        <div key={option._id} className="border rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-semibold text-lg">{option.name}</h4>
-            <button
-              onClick={() => deleteOption(option._id)}
-              className="text-error"
-            >
-              <Trash2 size={18} />
-            </button>
-          </div>
-          <div className="flex gap-2 mb-3">
-            <input
-              type="text"
-              placeholder="Add process step"
-              value={processInputs[option._id] || ""}
-              onChange={(e) =>
-                setProcessInputs({
-                  ...processInputs,
-                  [option._id]: e.target.value,
-                })
-              }
-              onKeyDown={(e) => e.key === "Enter" && addStep(option._id)}
-              className="flex-1 px-3 py-2 border rounded-lg"
-            />
-            <button
-              onClick={() => addStep(option._id)}
-              className="bg-gray-200 px-3 py-2 rounded-lg hover:bg-gray-300"
-            >
-              Add
-            </button>
-          </div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={(e) => handleDragEnd(e, option._id)}
+
+      <div className="space-y-6">
+        {options.map((option) => (
+          <motion.div
+            key={option._id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-gray-50 rounded-2xl p-5 border border-gray-200"
           >
-            <SortableContext
-              items={option.processSteps}
-              strategy={verticalListSortingStrategy}
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-bold text-lg text-gray-900">{option.name}</h4>
+              <button
+                onClick={() => setConfirmDeleteOption(option._id)}
+                className="text-gray-400 hover:text-red-500 transition cursor-pointer"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Add process step"
+                value={processInputs[option._id] || ""}
+                onChange={(e) =>
+                  setProcessInputs({
+                    ...processInputs,
+                    [option._id]: e.target.value,
+                  })
+                }
+                onKeyDown={(e) => e.key === "Enter" && addStep(option._id)}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition"
+              />
+              <button
+                onClick={() => addStep(option._id)}
+                className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-xl text-sm font-medium transition cursor-pointer"
+              >
+                Add
+              </button>
+            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(e) => handleDragEnd(e, option._id)}
             >
-              <div className="space-y-2">
-                {option.processSteps.map((step: string, idx: number) => (
-                  <SortableStep
-                    key={step}
-                    step={step}
-                    onDelete={() => removeStep(option._id, idx)}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
-      ))}
-    </div>
+              <SortableContext
+                items={option.processSteps}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2">
+                  {option.processSteps.map((step: string, idx: number) => (
+                    <SortableStep
+                      key={step}
+                      step={step}
+                      onDelete={() => removeStep(option._id, idx)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </motion.div>
+        ))}
+      </div>
+
+      <ConfirmModal
+        open={!!confirmDeleteOption}
+        setOpen={() => setConfirmDeleteOption(null)}
+        title="Delete Order Type"
+        message="This will permanently delete this order type and all its process steps. Are you sure?"
+        onConfirm={() =>
+          confirmDeleteOption && deleteOption(confirmDeleteOption)
+        }
+      />
+    </motion.div>
   );
 }
 
-// ---------- User Management Table ----------
+// ==================== User Management ====================
 function UserManagement() {
   const [users, setUsers] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState<any>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -444,10 +623,9 @@ function UserManagement() {
   };
 
   const deleteUser = async (id: string) => {
-    if (!confirm("Delete this user?")) return;
     try {
       await axios.delete(`/api/users/${id}`);
-      toast.success("Deleted");
+      toast.success("User deleted");
       fetchUsers();
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Cannot delete");
@@ -455,13 +633,12 @@ function UserManagement() {
   };
 
   const resetPassword = async (id: string) => {
-    const newPass = prompt("Enter new password (min 6 chars):");
-    if (!newPass) return;
     try {
       await axios.patch(`/api/users/${id}/reset-password`, {
-        newPassword: newPass,
+        newPassword: "pass1234",
       });
-      toast.success("Password reset");
+      toast.success("Password reset to 'pass1234'");
+      fetchUsers();
     } catch (err: any) {
       toast.error(err.response?.data?.error || "Failed");
     }
@@ -472,7 +649,7 @@ function UserManagement() {
     setForm({
       name: user.name,
       email: user.email,
-      password: "", // not editable
+      password: "",
       mobile: user.mobile || "",
       fatherName: user.fatherName || "",
       address: user.address || "",
@@ -481,134 +658,202 @@ function UserManagement() {
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Users</h3>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+    >
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-linear-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+            <UserPlus size={20} className="text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Users</h3>
+            <p className="text-sm text-gray-500">Manage team members</p>
+          </div>
+        </div>
         <button
           onClick={() => {
             resetForm();
             setShowCreate(true);
           }}
-          className="flex items-center gap-1 bg-primary text-on-primary px-3 py-2 rounded-lg"
+          className="flex items-center gap-2 bg-linear-to-r from-primary to-primary-dark text-white px-5 py-3 rounded-xl text-sm font-medium hover:shadow-lg transition-all cursor-pointer"
         >
-          <Plus size={16} /> Add User
+          <UserPlus size={18} /> Add User
         </button>
       </div>
 
-      {(showCreate || editUser) && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-2 gap-3"
-        >
-          <input
-            type="text"
-            placeholder="Name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="px-3 py-2 border rounded"
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="px-3 py-2 border rounded"
-          />
-          {showCreate && (
-            <input
-              type="password"
-              placeholder="Password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="px-3 py-2 border rounded"
-            />
-          )}
-          <input
-            type="text"
-            placeholder="Mobile"
-            value={form.mobile}
-            onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-            className="px-3 py-2 border rounded"
-          />
-          <input
-            type="text"
-            placeholder="Father's Name"
-            value={form.fatherName}
-            onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
-            className="px-3 py-2 border rounded"
-          />
-          <input
-            type="text"
-            placeholder="Address"
-            value={form.address}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
-            className="px-3 py-2 border rounded md:col-span-2"
-          />
-          <div className="md:col-span-2 flex gap-2">
-            <button
-              onClick={editUser ? handleUpdate : handleCreate}
-              className="bg-primary text-on-primary px-4 py-2 rounded"
-            >
-              {editUser ? "Update" : "Create"}
-            </button>
-            <button
-              onClick={resetForm}
-              className="bg-gray-300 px-4 py-2 rounded"
-            >
-              Cancel
-            </button>
-          </div>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {(showCreate || editUser) && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-linear-to-r from-gray-50 to-white p-6 rounded-2xl mb-6 border border-gray-200 overflow-hidden"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Name *"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+              <input
+                type="email"
+                placeholder="Email *"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+              {showCreate && (
+                <input
+                  type="password"
+                  placeholder="Password *"
+                  value={form.password}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
+                  className="px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                />
+              )}
+              <input
+                type="text"
+                placeholder="Mobile"
+                value={form.mobile}
+                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                className="px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+              <input
+                type="text"
+                placeholder="Father's Name"
+                value={form.fatherName}
+                onChange={(e) =>
+                  setForm({ ...form, fatherName: e.target.value })
+                }
+                className="px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+              />
+              <input
+                type="text"
+                placeholder="Address"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition md:col-span-2"
+              />
+            </div>
+            <div className="flex gap-3 mt-6 justify-end">
+              <button
+                onClick={resetForm}
+                className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 rounded-xl text-sm font-medium transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={editUser ? handleUpdate : handleCreate}
+                className="px-6 py-2.5 bg-linear-to-r from-primary to-primary-dark text-white rounded-xl text-sm font-medium hover:shadow-lg transition-all cursor-pointer"
+              >
+                {editUser ? "Update User" : "Create User"}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2 text-left">Name</th>
-              <th className="p-2 text-left">Email</th>
-              <th className="p-2 text-left">Mobile</th>
-              <th className="p-2 text-left">Role</th>
-              <th className="p-2 text-left">Actions</th>
+            <tr className="bg-gray-50">
+              <th className="p-4 text-left font-semibold text-gray-700">
+                Name
+              </th>
+              <th className="p-4 text-left font-semibold text-gray-700">
+                Email
+              </th>
+              <th className="p-4 text-left font-semibold text-gray-700">
+                Mobile
+              </th>
+              <th className="p-4 text-left font-semibold text-gray-700">
+                Role
+              </th>
+              <th className="p-4 text-left font-semibold text-gray-700">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u._id} className="border-b">
-                <td className="p-2">{u.name}</td>
-                <td className="p-2">{u.email}</td>
-                <td className="p-2">{u.mobile}</td>
-                <td className="p-2">{u.role}</td>
-                <td className="p-2 flex gap-2">
-                  <button onClick={() => openEdit(u)} className="text-blue-600">
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => resetPassword(u._id)}
-                    className="text-yellow-600"
+              <tr
+                key={u._id}
+                className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
+              >
+                <td className="p-4 font-medium text-gray-800">{u.name}</td>
+                <td className="p-4 text-gray-600">{u.email}</td>
+                <td className="p-4 text-gray-600">{u.mobile}</td>
+                <td className="p-4">
+                  <span
+                    className={cn(
+                      "px-2 py-1 rounded-full text-xs font-medium",
+                      u.role === "admin"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-blue-100 text-blue-700",
+                    )}
                   >
-                    Reset PW
-                  </button>
-                  {u.role !== "admin" && (
+                    {u.role}
+                  </span>
+                </td>
+                <td className="p-4">
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => deleteUser(u._id)}
-                      className="text-error"
+                      onClick={() => openEdit(u)}
+                      className="text-blue-600 hover:text-blue-800 transition cursor-pointer"
+                      title="Edit"
                     >
-                      Delete
+                      <Edit size={16} />
                     </button>
-                  )}
+                    <button
+                      onClick={() => setConfirmReset(u._id)}
+                      className="text-yellow-600 hover:text-yellow-800 transition cursor-pointer"
+                      title="Reset Password"
+                    >
+                      <Key size={16} />
+                    </button>
+                    {u.role !== "admin" && (
+                      <button
+                        onClick={() => setConfirmDelete(u._id)}
+                        className="text-red-600 hover:text-red-800 transition cursor-pointer"
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </div>
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        setOpen={() => setConfirmDelete(null)}
+        title="Delete User"
+        message="Are you sure you want to delete this user? They will lose access permanently."
+        onConfirm={() => confirmDelete && deleteUser(confirmDelete)}
+      />
+      <ConfirmModal
+        open={!!confirmReset}
+        setOpen={() => setConfirmReset(null)}
+        title="Reset Password"
+        message="This will reset the user's password to 'pass1234'. They will need to change it on next login."
+        onConfirm={() => confirmReset && resetPassword(confirmReset)}
+      />
+    </motion.div>
   );
 }
 
-// ---------- Change Password (own) ----------
+// ==================== Change Password ====================
 function ChangePassword() {
   const [current, setCurrent] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -624,98 +869,129 @@ function ChangePassword() {
         currentPassword: current,
         newPassword: newPass,
       });
-      toast.success("Password changed");
+      toast.success("Password changed successfully");
       setCurrent("");
       setNewPass("");
       setConfirm("");
     } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed");
+      toast.error(err.response?.data?.error || "Failed to change password");
     }
   };
 
   return (
-    <div className="space-y-3 max-w-md">
-      <h3 className="text-lg font-semibold">Change Your Password</h3>
-      <input
-        type="password"
-        placeholder="Current password"
-        value={current}
-        onChange={(e) => setCurrent(e.target.value)}
-        className="w-full px-3 py-2 border rounded"
-      />
-      <input
-        type="password"
-        placeholder="New password"
-        value={newPass}
-        onChange={(e) => setNewPass(e.target.value)}
-        className="w-full px-3 py-2 border rounded"
-      />
-      <input
-        type="password"
-        placeholder="Confirm new password"
-        value={confirm}
-        onChange={(e) => setConfirm(e.target.value)}
-        className="w-full px-3 py-2 border rounded"
-      />
-      <button
-        onClick={handleChange}
-        className="bg-primary text-on-primary px-4 py-2 rounded"
-      >
-        Change Password
-      </button>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <div className="h-10 w-10 rounded-xl bg-linear-to-br from-yellow-500 to-yellow-600 flex items-center justify-center">
+          <Key size={20} className="text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">
+            Change Your Password
+          </h3>
+          <p className="text-sm text-gray-500">Keep your account secure</p>
+        </div>
+      </div>
+      <div className="space-y-4 max-w-lg">
+        <input
+          type="password"
+          placeholder="Current password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+        />
+        <input
+          type="password"
+          placeholder="New password"
+          value={newPass}
+          onChange={(e) => setNewPass(e.target.value)}
+          className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+        />
+        <input
+          type="password"
+          placeholder="Confirm new password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+        />
+        <button
+          onClick={handleChange}
+          className="bg-linear-to-r from-primary to-primary-dark text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all cursor-pointer"
+        >
+          Update Password
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
-// ---------- Main Settings Page with Tabs ----------
+// ==================== Main Settings Page ====================
 const tabs = [
-  "Print Heading",
-  "Cash Categories",
-  "Order Options",
-  "Users",
-  "Password",
-] as const;
+  { key: "print", label: "Print Heading", icon: Save },
+  { key: "cash", label: "Cash Categories", icon: Trash2 },
+  { key: "orders", label: "Order Options", icon: GripVertical },
+  { key: "users", label: "Users", icon: UserPlus },
+  { key: "password", label: "Password", icon: Key },
+];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<string>("Print Heading");
+  const [activeTab, setActiveTab] = useState("print");
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Settings</h2>
-      <div className="flex flex-wrap gap-2 mb-6 border-b pb-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "px-4 py-2 rounded-t-lg transition",
-              activeTab === tab
-                ? "bg-primary text-on-primary"
-                : "bg-gray-100 hover:bg-gray-200",
-            )}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="mb-8">
+        <h2 className="text-3xl font-extrabold text-gray-900">Settings</h2>
+        <p className="text-gray-500 mt-1">
+          Manage your application preferences
+        </p>
       </div>
-      <div className="bg-white p-6 rounded-2xl shadow">
-        {activeTab === "Print Heading" && <PrintHeadingForm />}
-        {activeTab === "Cash Categories" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium mb-2">Cash In Categories</h4>
+
+      {/* Modern Tab Bar */}
+      <div className="flex flex-wrap gap-2 mb-8 bg-white p-2 rounded-2xl shadow-sm border border-gray-100">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex items-center gap-2 px-5 py-3 rounded-xl font-medium text-sm transition-all cursor-pointer",
+                activeTab === tab.key
+                  ? "bg-linear-to-r from-primary to-primary-dark text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-100",
+              )}
+            >
+              <Icon size={18} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.2 }}
+        >
+          {activeTab === "print" && <PrintHeadingForm />}
+          {activeTab === "cash" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <CashCategories type="in" />
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Cash Out Categories</h4>
               <CashCategories type="out" />
             </div>
-          </div>
-        )}
-        {activeTab === "Order Options" && <OrderOptionsSection />}
-        {activeTab === "Users" && <UserManagement />}
-        {activeTab === "Password" && <ChangePassword />}
-      </div>
+          )}
+          {activeTab === "orders" && <OrderOptionsSection />}
+          {activeTab === "users" && <UserManagement />}
+          {activeTab === "password" && <ChangePassword />}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

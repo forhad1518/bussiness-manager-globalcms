@@ -10,14 +10,13 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Printer,
   Pencil,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { CardSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 
-// ---------- Types ----------
 interface CashCategory {
   _id: string;
   name: string;
@@ -34,11 +33,10 @@ interface CashTransaction {
   createdAt: string;
 }
 
-// ---------- Today In Card ----------
 function TodayCard({ amount }: { amount: number }) {
   return (
     <Fade triggerOnce>
-      <div className="bg-green-600 text-white p-4 rounded-xl shadow-lg mb-6">
+      <div className="bg-green-600 text-white p-4 rounded-xl shadow mb-6">
         <p className="text-sm opacity-90">Today In</p>
         <p className="text-3xl font-bold">৳ {amount}</p>
       </div>
@@ -46,7 +44,6 @@ function TodayCard({ amount }: { amount: number }) {
   );
 }
 
-// ---------- Add Cash In Drawer ----------
 function AddCashDrawer({
   open,
   setOpen,
@@ -117,7 +114,10 @@ function AddCashDrawer({
               <h2 className="text-xl font-bold">
                 Add Cash {type === "in" ? "In" : "Out"}
               </h2>
-              <button onClick={() => setOpen(false)}>
+              <button
+                onClick={() => setOpen(false)}
+                className="hover:bg-gray-100 p-1 rounded"
+              >
                 <X size={24} />
               </button>
             </div>
@@ -127,7 +127,7 @@ function AddCashDrawer({
                 onChange={(e) =>
                   setForm({ ...form, categoryId: e.target.value })
                 }
-                className="w-full px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-lg cursor-pointer"
                 required
               >
                 <option value="">Select Category</option>
@@ -156,7 +156,7 @@ function AddCashDrawer({
               />
               <button
                 type="submit"
-                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition"
+                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition cursor-pointer"
               >
                 Add
               </button>
@@ -168,7 +168,6 @@ function AddCashDrawer({
   );
 }
 
-// ---------- Edit Cash Modal ----------
 function EditCashModal({
   open,
   setOpen,
@@ -248,13 +247,13 @@ function EditCashModal({
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setOpen(false)}
-                  className="px-4 py-2 bg-gray-200 rounded-lg"
+                  className="px-4 py-2 bg-gray-200 rounded-lg cursor-pointer hover:bg-gray-300 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdate}
-                  className="px-4 py-2 bg-primary text-white rounded-lg"
+                  className="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-dark transition"
                 >
                   Save
                 </button>
@@ -267,10 +266,10 @@ function EditCashModal({
   );
 }
 
-// ---------- Main Cash In Page ----------
 export default function CashInPage() {
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [todayIn, setTodayIn] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -282,19 +281,26 @@ export default function CashInPage() {
   const [category, setCategory] = useState("");
 
   const fetchTransactions = useCallback(async () => {
-    const params: any = { page, limit: 10, type: "in" };
-    if (search) params.search = search;
-    if (from) params.from = from;
-    if (to) params.to = to;
-    if (category) params.category = category;
+    setLoading(true);
+    try {
+      const params: any = { page, limit: 10, type: "in" };
+      if (search) params.search = search;
+      if (from) params.from = from;
+      if (to) params.to = to;
+      if (category) params.category = category;
 
-    const [listRes, summaryRes] = await Promise.all([
-      axios.get("/api/cash", { params }),
-      axios.get("/api/cash?type=in&summary=1"),
-    ]);
-    setTransactions(listRes.data.transactions);
-    setTotalPages(listRes.data.pagination.totalPages);
-    setTodayIn(summaryRes.data.todayTotal);
+      const [listRes, summaryRes] = await Promise.all([
+        axios.get("/api/cash", { params }),
+        axios.get("/api/cash?type=in&summary=1"),
+      ]);
+      setTransactions(listRes.data.transactions);
+      setTotalPages(listRes.data.pagination.totalPages);
+      setTodayIn(summaryRes.data.todayTotal);
+    } catch {
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
   }, [page, search, from, to, category]);
 
   useEffect(() => {
@@ -314,15 +320,14 @@ export default function CashInPage() {
         <h2 className="text-2xl font-bold">Cash In</h2>
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark"
+          className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition cursor-pointer"
         >
           <Plus size={18} /> Add Cash In
         </button>
       </div>
 
-      <TodayCard amount={todayIn} />
+      {loading ? <CardSkeleton /> : <TodayCard amount={todayIn} />}
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-50">
           <Search
@@ -344,77 +349,81 @@ export default function CashInPage() {
           type="date"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border rounded-lg cursor-pointer"
         />
         <input
           type="date"
           value={to}
           onChange={(e) => setTo(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border rounded-lg cursor-pointer"
         />
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="px-3 py-2 border rounded-lg"
+          className="px-3 py-2 border rounded-lg cursor-pointer"
         >
           <option value="">All Categories</option>
-          {/* We could load categories dynamically, but for now leave static */}
         </select>
       </div>
 
-      {/* Table */}
-      <Fade direction="up" triggerOnce>
-        <div className="overflow-x-auto bg-white rounded-2xl shadow">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="p-3 text-left">Date</th>
-                <th className="p-3 text-left">Category</th>
-                <th className="p-3 text-left">Amount</th>
-                <th className="p-3 text-left">Description</th>
-                <th className="p-3 text-left">User</th>
-                <th className="p-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((txn) => (
-                <tr key={txn._id} className="border-b hover:bg-gray-50">
-                  <td className="p-3">
-                    {format(new Date(txn.createdAt), "dd/MM/yyyy HH:mm")}
-                  </td>
-                  <td className="p-3">{txn.categoryId?.name || "-"}</td>
-                  <td className="p-3 font-semibold text-green-600">
-                    ৳ {txn.amount}
-                  </td>
-                  <td className="p-3 max-w-50 truncate">
-                    {txn.description || "-"}
-                  </td>
-                  <td className="p-3">{txn.user?.name || "-"}</td>
-                  <td className="p-3 flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedTxn(txn);
-                        setEditModal(true);
-                      }}
-                      className="text-blue-600"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(txn._id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+      {loading ? (
+        <TableSkeleton rows={4} cols={6} />
+      ) : (
+        <Fade direction="up" triggerOnce>
+          <div className="overflow-x-auto bg-white rounded-2xl shadow">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-3 text-left">Date</th>
+                  <th className="p-3 text-left">Category</th>
+                  <th className="p-3 text-left">Amount</th>
+                  <th className="p-3 text-left">Description</th>
+                  <th className="p-3 text-left">User</th>
+                  <th className="p-3 text-left">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Fade>
+              </thead>
+              <tbody>
+                {transactions.map((txn) => (
+                  <tr
+                    key={txn._id}
+                    className="border-b hover:bg-gray-50 transition cursor-pointer"
+                  >
+                    <td className="p-3">
+                      {format(new Date(txn.createdAt), "dd/MM/yyyy HH:mm")}
+                    </td>
+                    <td className="p-3">{txn.categoryId?.name || "-"}</td>
+                    <td className="p-3 font-semibold text-green-600">
+                      ৳ {txn.amount}
+                    </td>
+                    <td className="p-3 max-w-50 truncate">
+                      {txn.description || "-"}
+                    </td>
+                    <td className="p-3">{txn.user?.name || "-"}</td>
+                    <td className="p-3 flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedTxn(txn);
+                          setEditModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(txn._id)}
+                        className="text-red-600 hover:text-red-800 cursor-pointer"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Fade>
+      )}
 
-      {/* Pagination */}
       <div className="flex items-center justify-between mt-4">
         <span className="text-sm text-gray-600">
           Page {page} of {totalPages}
@@ -423,14 +432,14 @@ export default function CashInPage() {
           <button
             disabled={page <= 1}
             onClick={() => setPage(page - 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50"
+            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             disabled={page >= totalPages}
             onClick={() => setPage(page + 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50"
+            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
           >
             <ChevronRight size={18} />
           </button>

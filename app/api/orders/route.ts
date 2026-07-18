@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/dbConnect";
 import Order from "@/models/Order";
+import Client from "@/models/Client";
 import { getAuthUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -18,17 +19,31 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search") || "";
   const summary = searchParams.get("summary") === "1";
 
-  const filter: any = {};
-  if (status) filter.status = status;
+  // Build filter with $and for flexibility
+  const conditions: any[] = [];
+  if (status) conditions.push({ status });
   if (from || to) {
-    filter.createdAt = {};
-    if (from) filter.createdAt.$gte = new Date(from);
-    if (to) filter.createdAt.$lte = new Date(to);
+    const dateFilter: any = {};
+    if (from) dateFilter.$gte = new Date(from);
+    if (to) dateFilter.$lte = new Date(to);
+    conditions.push({ createdAt: dateFilter });
   }
+
   if (search) {
-    const regex = new RegExp(search, "i");
-    // We'll populate client and search name/mobile later, but for now search uniqueId
-    filter.$or = [{ uniqueId: regex }];
+    // Find matching clients
+    const searchRegex = new RegExp(search, "i");
+    const clientIds = await Client.find({
+      $or: [{ name: searchRegex }, { mobile: searchRegex }],
+    }).distinct("_id");
+
+    conditions.push({
+      $or: [{ uniqueId: searchRegex }, { clientId: { $in: clientIds } }],
+    });
+  }
+
+  const filter: any = {};
+  if (conditions.length > 0) {
+    filter.$and = conditions;
   }
 
   if (summary) {
@@ -65,13 +80,21 @@ export async function GET(req: NextRequest) {
             status: "successful",
           },
         },
-        { $group: { _id: null, totalAmount: { $sum: "$amount" } } },
+        {
+          $group: {
+            _id: null,
+            totalAmount: { $sum: "$amount" },
+          },
+        },
       ]),
       Order.aggregate([
         {
           $match: {
             status: "successful",
-            "successData.settledAt": { $gte: startOfMonth, $lte: endOfMonth },
+            "successData.settledAt": {
+              $gte: startOfMonth,
+              $lte: endOfMonth,
+            },
           },
         },
         {
@@ -143,7 +166,7 @@ export async function POST(req: NextRequest) {
     orderOptionId,
     amount,
     payAmount: payAmount || 0,
-    deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
+    deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
     status: "submit",
     createdBy: user.userId,
     statusHistory: [

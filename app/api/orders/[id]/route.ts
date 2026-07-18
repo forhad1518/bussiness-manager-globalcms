@@ -55,7 +55,7 @@ export async function PUT(
   if (amount !== undefined) order.amount = amount;
   if (payAmount !== undefined) order.payAmount = payAmount;
   if (deliveryDate !== undefined)
-    order.deliveryDate = deliveryDate ? new Date(deliveryDate) : null;
+    order.deliveryDate = deliveryDate ? new Date(deliveryDate) : undefined;
   if (currentStep !== undefined) order.currentStep = currentStep;
 
   await order.save();
