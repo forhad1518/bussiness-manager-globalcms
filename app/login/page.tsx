@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { LogIn } from "lucide-react";
+import FormField from "@/components/ui/FormField";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -21,6 +23,7 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       setError(err.response?.data?.error || "Login failed");
+      toast.error("Login failed");
     }
   };
 
@@ -39,10 +42,7 @@ export default function LoginPage() {
           <p className="text-error text-sm mb-4 text-center">{error}</p>
         )}
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
+          <FormField label="Email">
             <input
               type="email"
               required
@@ -51,11 +51,8 @@ export default function LoginPage() {
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
               placeholder="admin@example.com"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
+          </FormField>
+          <FormField label="Password">
             <input
               type="password"
               required
@@ -64,13 +61,12 @@ export default function LoginPage() {
               className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
               placeholder="••••••••"
             />
-          </div>
+          </FormField>
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-on-primary py-2.5 rounded-lg transition"
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-on-primary py-2.5 rounded-lg transition cursor-pointer"
           >
-            <LogIn size={18} />
-            Sign In
+            <LogIn size={18} /> Sign In
           </button>
         </form>
       </motion.div>

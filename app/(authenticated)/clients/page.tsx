@@ -14,12 +14,18 @@ import {
   Ban,
   DollarSign,
   Pencil,
+  RotateCcw,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { TableSkeleton } from "@/components/ui/Skeleton";
+import Drawer from "@/components/ui/Drawer";
+import FormField from "@/components/ui/FormField";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import { useRouter } from "next/navigation";
 
-// Types
 interface Client {
   _id: string;
   name: string;
@@ -30,8 +36,9 @@ interface Client {
   dueAmount: number;
   status: "active" | "terminated";
   nextDueDate?: string;
+  totalWork: number;
+  profit: number;
   createdAt: string;
-  updatedAt: string;
 }
 
 // ---------- Card Section ----------
@@ -77,45 +84,28 @@ function ClientCards({ summary }: { summary: any }) {
   );
 }
 
-// ---------- Add Client Drawer ----------
-function AddClientDrawer({
+// ---------- Terminate/Reactivate Modal ----------
+function StatusModal({
   open,
-  setOpen,
-  refresh,
+  onClose,
+  action,
+  clientName,
+  onConfirm,
 }: {
   open: boolean;
-  setOpen: (v: boolean) => void;
-  refresh: () => void;
+  onClose: () => void;
+  action: "terminate" | "reactivate";
+  clientName: string;
+  onConfirm: (reason: string) => void;
 }) {
-  const [form, setForm] = useState({
-    name: "",
-    fatherName: "",
-    mobile: "",
-    secondaryMobile: "",
-    address: "",
-  });
+  const [reason, setReason] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name || !form.mobile) {
-      toast.error("Name and mobile are required");
+  const handleSubmit = () => {
+    if (!reason.trim()) {
+      toast.error("Please provide a reason");
       return;
     }
-    try {
-      await axios.post("/api/clients", form);
-      toast.success("Client added");
-      setForm({
-        name: "",
-        fatherName: "",
-        mobile: "",
-        secondaryMobile: "",
-        address: "",
-      });
-      setOpen(false);
-      refresh();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed");
-    }
+    onConfirm(reason);
   };
 
   return (
@@ -123,131 +113,11 @@ function AddClientDrawer({
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/50 z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setOpen(false)}
-          />
-          <motion.div
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-white z-50 shadow-2xl p-6 overflow-y-auto"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Add Client</h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="hover:bg-gray-100 p-1 rounded"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input
-                type="text"
-                placeholder="Client Name *"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Father's Name"
-                value={form.fatherName}
-                onChange={(e) =>
-                  setForm({ ...form, fatherName: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Mobile *"
-                value={form.mobile}
-                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Secondary Mobile"
-                value={form.secondaryMobile}
-                onChange={(e) =>
-                  setForm({ ...form, secondaryMobile: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-              <textarea
-                placeholder="Address"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg"
-                rows={3}
-              />
-              <button
-                type="submit"
-                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition cursor-pointer"
-              >
-                Add Client
-              </button>
-            </form>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// ---------- Edit Mobile Modal ----------
-function EditMobileModal({
-  open,
-  setOpen,
-  client,
-  refresh,
-}: {
-  open: boolean;
-  setOpen: (v: boolean) => void;
-  client: Client | null;
-  refresh: () => void;
-}) {
-  const [mobile, setMobile] = useState("");
-  const [secondaryMobile, setSecondaryMobile] = useState("");
-  const [type, setType] = useState<"mobile" | "secondary">("mobile");
-
-  useEffect(() => {
-    if (client) {
-      setMobile(client.mobile);
-      setSecondaryMobile(client.secondaryMobile);
-    }
-  }, [client]);
-
-  const handleSave = async () => {
-    if (!client) return;
-    try {
-      await axios.patch(`/api/clients/${client._id}`, {
-        action: "update-mobile",
-        mobile: type === "mobile" ? mobile : undefined,
-        secondaryMobile: type === "secondary" ? secondaryMobile : undefined,
-      });
-      toast.success("Mobile updated");
-      setOpen(false);
-      refresh();
-    } catch {
-      toast.error("Failed to update");
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      {open && client && (
-        <>
-          <motion.div
-            className="fixed inset-0 bg-black/50 z-40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setOpen(false)}
+            onClick={onClose}
           />
           <motion.div
             className="fixed inset-0 flex items-center justify-center z-50 p-4"
@@ -256,58 +126,38 @@ function EditMobileModal({
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
             >
-              <h3 className="text-lg font-semibold mb-4">Edit Mobile</h3>
-              <div className="flex gap-2 mb-3">
-                <button
-                  onClick={() => setType("mobile")}
-                  className={cn(
-                    "px-3 py-1 rounded cursor-pointer transition",
-                    type === "mobile"
-                      ? "bg-primary text-white"
-                      : "bg-gray-200 hover:bg-gray-300",
-                  )}
-                >
-                  Primary
-                </button>
-                <button
-                  onClick={() => setType("secondary")}
-                  className={cn(
-                    "px-3 py-1 rounded cursor-pointer transition",
-                    type === "secondary"
-                      ? "bg-primary text-white"
-                      : "bg-gray-200 hover:bg-gray-300",
-                  )}
-                >
-                  Secondary
-                </button>
-              </div>
-              <input
-                type="text"
-                value={type === "mobile" ? mobile : secondaryMobile}
-                onChange={(e) =>
-                  type === "mobile"
-                    ? setMobile(e.target.value)
-                    : setSecondaryMobile(e.target.value)
-                }
+              <h3 className="text-lg font-bold mb-2">
+                {action === "terminate" ? "Terminate" : "Reactivate"}{" "}
+                {clientName}
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Please provide a reason for{" "}
+                {action === "terminate" ? "termination" : "reactivation"}.
+              </p>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg mb-4"
+                rows={3}
+                placeholder="Reason..."
               />
               <div className="flex gap-2 justify-end">
                 <button
-                  onClick={() => setOpen(false)}
-                  className="px-4 py-2 bg-gray-200 rounded-lg cursor-pointer hover:bg-gray-300 transition"
+                  onClick={onClose}
+                  className="px-4 py-2 bg-gray-200 rounded-lg"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-dark transition"
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-primary text-white rounded-lg"
                 >
-                  Save
+                  {action === "terminate" ? "Terminate" : "Reactivate"}
                 </button>
               </div>
             </motion.div>
@@ -331,6 +181,7 @@ function ViewLogsModal({
   const [transactions, setTransactions] = useState<any[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const router = useRouter();
 
   const fetchLogs = useCallback(async () => {
     if (!clientId) return;
@@ -352,7 +203,7 @@ function ViewLogsModal({
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/50 z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -372,10 +223,7 @@ function ViewLogsModal({
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Client Logs</h3>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="hover:bg-gray-100 p-1 rounded"
-                >
+                <button onClick={() => setOpen(false)}>
                   <X size={24} />
                 </button>
               </div>
@@ -394,7 +242,7 @@ function ViewLogsModal({
                 />
                 <button
                   onClick={fetchLogs}
-                  className="bg-primary text-white px-4 py-2 rounded cursor-pointer hover:bg-primary-dark transition"
+                  className="bg-primary text-white px-4 py-2 rounded"
                 >
                   Filter
                 </button>
@@ -406,15 +254,11 @@ function ViewLogsModal({
                     <th className="p-2 text-left">Type</th>
                     <th className="p-2 text-left">Amount</th>
                     <th className="p-2 text-left">Description</th>
-                    <th className="p-2 text-left">By</th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.map((t) => (
-                    <tr
-                      key={t._id}
-                      className="border-b hover:bg-gray-50 transition cursor-pointer"
-                    >
+                    <tr key={t._id} className="border-b hover:bg-gray-50">
                       <td className="p-2">
                         {format(new Date(t.createdAt), "dd/MM/yyyy")}
                       </td>
@@ -425,7 +269,6 @@ function ViewLogsModal({
                         {t.amount ? `৳ ${t.amount}` : "-"}
                       </td>
                       <td className="p-2">{t.description}</td>
-                      <td className="p-2">{t.createdBy?.name || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -438,48 +281,249 @@ function ViewLogsModal({
   );
 }
 
-// ---------- Pay Row (improved) ----------
+// ---------- Add Client Drawer ----------
+function AddClientDrawer({
+  open,
+  setOpen,
+  refresh,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  refresh: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    fatherName: "",
+    mobile: "",
+    secondaryMobile: "",
+    address: "",
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.mobile) {
+      toast.error("Name & mobile required");
+      return;
+    }
+    try {
+      await axios.post("/api/clients", form);
+      toast.success("Client added");
+      setForm({
+        name: "",
+        fatherName: "",
+        mobile: "",
+        secondaryMobile: "",
+        address: "",
+      });
+      setOpen(false);
+      refresh();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed");
+    }
+  };
+
+  return (
+    <Drawer open={open} onClose={() => setOpen(false)} title="Add Client">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <FormField label="Client Name">
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg"
+            required
+          />
+        </FormField>
+        <FormField label="Father's Name">
+          <input
+            type="text"
+            value={form.fatherName}
+            onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </FormField>
+        <FormField label="Mobile">
+          <input
+            type="text"
+            value={form.mobile}
+            onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg"
+            required
+          />
+        </FormField>
+        <FormField label="Secondary Mobile">
+          <input
+            type="text"
+            value={form.secondaryMobile}
+            onChange={(e) =>
+              setForm({ ...form, secondaryMobile: e.target.value })
+            }
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </FormField>
+        <FormField label="Address">
+          <textarea
+            value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg"
+            rows={3}
+          />
+        </FormField>
+        <button
+          type="submit"
+          className="w-full bg-primary text-white py-2.5 rounded-lg"
+        >
+          Add Client
+        </button>
+      </form>
+    </Drawer>
+  );
+}
+
+// ---------- Edit Mobile Modal ----------
+function EditMobileModal({
+  open,
+  setOpen,
+  client,
+  refresh,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  client: Client | null;
+  refresh: () => void;
+}) {
+  const [mobile, setMobile] = useState("");
+  const [secondaryMobile, setSecondaryMobile] = useState("");
+
+  useEffect(() => {
+    if (client) {
+      setMobile(client.mobile);
+      setSecondaryMobile(client.secondaryMobile);
+    }
+  }, [client]);
+
+  const handleSave = async () => {
+    if (!client) return;
+    try {
+      await axios.patch(`/api/clients/${client._id}`, {
+        action: "update-mobile",
+        mobile,
+        secondaryMobile,
+      });
+      toast.success("Mobile updated");
+      setOpen(false);
+      refresh();
+    } catch {
+      toast.error("Failed");
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open && client && (
+        <>
+          <motion.div
+            className="fixed inset-0 bg-black/50 z-40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+          />
+          <motion.div
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-2xl p-6 w-full max-w-sm"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+            >
+              <h3 className="text-lg font-semibold mb-4">Edit Mobile</h3>
+              <FormField label="Primary Mobile">
+                <input
+                  type="text"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </FormField>
+              <FormField label="Secondary Mobile">
+                <input
+                  type="text"
+                  value={secondaryMobile}
+                  onChange={(e) => setSecondaryMobile(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </FormField>
+              <div className="flex gap-2 justify-end mt-4">
+                <button
+                  onClick={() => setOpen(false)}
+                  className="px-4 py-2 bg-gray-200 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-primary text-white rounded-lg"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ---------- Pay Row (with profit/totalWork) ----------
 function PayRow({
   client,
   onPay,
-  onTerminate,
+  onStatusChange,
   onEditMobile,
   onViewLogs,
 }: {
   client: Client;
-  onPay: (id: string, amount: number) => void;
-  onTerminate: (client: Client) => void;
+  onPay: (id: string, amount: number, nextDueDate?: string) => void;
+  onStatusChange: (
+    action: "terminate" | "reactivate",
+    id: string,
+    reason: string,
+  ) => void;
   onEditMobile: () => void;
   onViewLogs: () => void;
 }) {
   const [payInput, setPayInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showDueDate, setShowDueDate] = useState(false);
+  const [loadingPay, setLoadingPay] = useState(false);
   const [nextDueDate, setNextDueDate] = useState("");
+  const [showDueDate, setShowDueDate] = useState(false);
+  const router = useRouter();
 
   const handlePay = async () => {
-    const amount = parseFloat(payInput);
-    if (!amount || amount <= 0) return toast.error("Enter valid amount");
-    setLoading(true);
+    const amt = parseFloat(payInput);
+    if (!amt || amt <= 0) {
+      toast.error("Invalid amount");
+      return;
+    }
+    setLoadingPay(true);
     try {
-      const payload: any = { action: "pay", amount };
-      if (showDueDate && nextDueDate) {
-        payload.nextDueDate = nextDueDate;
-      }
-      await axios.patch(`/api/clients/${client._id}`, payload);
-      toast.success(`Paid ৳${amount}`);
+      await onPay(client._id, amt, showDueDate ? nextDueDate : undefined);
       setPayInput("");
       setNextDueDate("");
       setShowDueDate(false);
-      onPay(client._id, amount);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Payment failed");
     } finally {
-      setLoading(false);
+      setLoadingPay(false);
     }
   };
 
-  const remainingDue = client.dueAmount - parseFloat(payInput || "0");
+  const handleOrderFilter = () => {
+    router.push(`/orders?search=${encodeURIComponent(client.name)}`);
+  };
 
   return (
     <tr className="border-b hover:bg-gray-50 transition cursor-pointer">
@@ -492,7 +536,7 @@ function PayRow({
           <span>{client.mobile}</span>
           <button
             onClick={onEditMobile}
-            className="text-blue-500 hover:text-blue-700 cursor-pointer"
+            className="text-blue-500 hover:text-blue-700"
           >
             <Pencil size={14} />
           </button>
@@ -503,58 +547,75 @@ function PayRow({
       </td>
       <td className="p-3 max-w-37.5 truncate">{client.address || "-"}</td>
       <td className="p-3 font-semibold text-red-600">৳ {client.dueAmount}</td>
+      <td className="p-3">৳ {client.totalWork}</td>
+      <td className="p-3 font-semibold text-green-600">৳ {client.profit}</td>
       <td className="p-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1">
             <input
               type="number"
               min="0"
-              placeholder="Amount"
+              placeholder="Pay"
               value={payInput}
               onChange={(e) => setPayInput(e.target.value)}
               className="w-20 px-2 py-1 border rounded text-sm"
-              disabled={loading}
             />
             <button
               onClick={handlePay}
-              disabled={loading}
-              className="bg-green-500 text-white p-1 rounded hover:bg-green-600 transition disabled:opacity-50 cursor-pointer"
+              disabled={loadingPay}
+              className="bg-green-500 text-white p-1 rounded hover:bg-green-600"
             >
-              {loading ? "..." : <DollarSign size={14} />}
+              <DollarSign size={14} />
             </button>
           </div>
-          {parseFloat(payInput) > 0 && remainingDue > 0 && (
-            <div className="flex items-center gap-1 text-xs">
-              <input
-                type="date"
-                value={nextDueDate}
-                onChange={(e) => {
-                  setNextDueDate(e.target.value);
-                  setShowDueDate(true);
-                }}
-                className="border rounded px-1 py-0.5 w-28"
-              />
-              <span className="text-gray-500">Next due date</span>
-            </div>
-          )}
+          {parseFloat(payInput) > 0 &&
+            client.dueAmount - parseFloat(payInput) > 0 && (
+              <div className="flex items-center gap-1 text-xs">
+                <input
+                  type="date"
+                  value={nextDueDate}
+                  onChange={(e) => {
+                    setNextDueDate(e.target.value);
+                    setShowDueDate(true);
+                  }}
+                  className="border rounded px-1 py-0.5 w-28"
+                />
+                <span className="text-gray-500">Next due</span>
+              </div>
+            )}
         </div>
       </td>
       <td className="p-3">
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
+          <button
+            onClick={handleOrderFilter}
+            title="View Orders"
+            className="text-indigo-600 hover:text-indigo-800"
+          >
+            <ShoppingCart size={16} />
+          </button>
           <button
             onClick={onViewLogs}
-            className="text-blue-600 hover:text-blue-800 cursor-pointer"
             title="View Logs"
+            className="text-blue-600 hover:text-blue-800"
           >
-            <Eye size={18} />
+            <Eye size={16} />
           </button>
-          {client.status === "active" && (
+          {client.status === "active" ? (
             <button
-              onClick={() => onTerminate(client)}
-              className="text-red-500 hover:text-red-700 cursor-pointer"
+              onClick={() => onStatusChange("terminate", client._id, "")}
               title="Terminate"
+              className="text-red-500 hover:text-red-700"
             >
-              <Ban size={18} />
+              <Ban size={16} />
+            </button>
+          ) : (
+            <button
+              onClick={() => onStatusChange("reactivate", client._id, "")}
+              title="Reactivate"
+              className="text-green-600 hover:text-green-800"
+            >
+              <RotateCcw size={16} />
             </button>
           )}
         </div>
@@ -563,7 +624,7 @@ function PayRow({
   );
 }
 
-// ---------- Main Clients Page ----------
+// ---------- Main Page ----------
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [summary, setSummary] = useState<any>({});
@@ -573,11 +634,18 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [logsOpen, setLogsOpen] = useState(false);
   const [logsClientId, setLogsClientId] = useState<string | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusAction, setStatusAction] = useState<"terminate" | "reactivate">(
+    "terminate",
+  );
+  const [statusTargetId, setStatusTargetId] = useState<string>("");
+  const [statusClientName, setStatusClientName] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [mutating, setMutating] = useState(false);
   const limit = 10;
 
   const fetchClients = useCallback(async () => {
@@ -586,7 +654,6 @@ export default function ClientsPage() {
       const params: any = { page, limit };
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
-
       const [listRes, summaryRes] = await Promise.all([
         axios.get("/api/clients", { params }),
         axios.get("/api/clients?summary=1"),
@@ -594,7 +661,7 @@ export default function ClientsPage() {
       setClients(listRes.data.clients);
       setTotalPages(listRes.data.pagination.totalPages);
       setSummary(summaryRes.data);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load clients");
     } finally {
       setLoading(false);
@@ -605,38 +672,65 @@ export default function ClientsPage() {
     fetchClients();
   }, [fetchClients]);
 
-  const handlePay = (clientId: string, amount: number) => {
-    // Refresh list after payment (already handled in PayRow via onPay prop)
-    fetchClients();
+  const handlePay = async (id: string, amount: number, dueDate?: string) => {
+    setMutating(true);
+    try {
+      await axios.patch(`/api/clients/${id}`, {
+        action: "pay",
+        amount,
+        nextDueDate: dueDate,
+      });
+      toast.success("Payment recorded");
+      fetchClients();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Payment failed");
+    } finally {
+      setMutating(false);
+    }
   };
 
-  const handleTerminate = async (client: Client) => {
-    if (!confirm(`Terminate ${client.name}?`)) return;
+  const handleStatusAction = (
+    action: "terminate" | "reactivate",
+    id: string,
+  ) => {
+    const client = clients.find((c) => c._id === id);
+    setStatusAction(action);
+    setStatusTargetId(id);
+    setStatusClientName(client?.name || "");
+    setStatusModalOpen(true);
+  };
+
+  const handleStatusConfirm = async (reason: string) => {
+    setMutating(true);
     try {
-      await axios.patch(`/api/clients/${client._id}`, { action: "terminate" });
-      toast.success(`${client.name} terminated`);
+      await axios.patch(`/api/clients/${statusTargetId}`, {
+        action: statusAction,
+        reason,
+      });
+      toast.success(`${statusAction} successful`);
+      setStatusModalOpen(false);
       fetchClients();
-    } catch {
-      toast.error("Failed");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed");
+    } finally {
+      setMutating(false);
     }
   };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex justify-between mb-6">
         <h2 className="text-2xl font-bold">Clients</h2>
         <button
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition cursor-pointer"
+          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark"
         >
           <Plus size={18} /> Add Client
         </button>
       </div>
 
-      {/* Cards */}
       <ClientCards summary={summary} />
 
-      {/* Filter & Search */}
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-50">
           <Search
@@ -644,8 +738,7 @@ export default function ClientsPage() {
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
           />
           <input
-            type="text"
-            placeholder="Search by name, mobile, father..."
+            placeholder="Search..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -660,7 +753,7 @@ export default function ClientsPage() {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-          className="px-3 py-2 border rounded-lg cursor-pointer"
+          className="px-3 py-2 border rounded-lg"
         >
           <option value="">All Status</option>
           <option value="active">Active</option>
@@ -668,9 +761,8 @@ export default function ClientsPage() {
         </select>
       </div>
 
-      {/* Table or Skeleton */}
       {loading ? (
-        <TableSkeleton rows={5} cols={9} />
+        <TableSkeleton rows={5} cols={12} />
       ) : (
         <Slide direction="up" triggerOnce>
           <div className="overflow-x-auto bg-white rounded-2xl shadow">
@@ -684,6 +776,8 @@ export default function ClientsPage() {
                   <th className="p-3 text-left">Mobile</th>
                   <th className="p-3 text-left">Address</th>
                   <th className="p-3 text-left">Due</th>
+                  <th className="p-3 text-left">Work</th>
+                  <th className="p-3 text-left">Profit</th>
                   <th className="p-3 text-left">Pay</th>
                   <th className="p-3 text-left">Actions</th>
                 </tr>
@@ -694,7 +788,9 @@ export default function ClientsPage() {
                     key={client._id}
                     client={client}
                     onPay={handlePay}
-                    onTerminate={handleTerminate}
+                    onStatusChange={(action, id) =>
+                      handleStatusAction(action, id)
+                    }
                     onEditMobile={() => {
                       setSelectedClient(client);
                       setEditMobileOpen(true);
@@ -711,23 +807,22 @@ export default function ClientsPage() {
         </Slide>
       )}
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between mt-4">
-        <span className="text-sm text-gray-600">
+      <div className="flex justify-between mt-4">
+        <span>
           Page {page} of {totalPages}
         </span>
         <div className="flex gap-2">
           <button
             disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
+            onClick={() => setPage((p) => p - 1)}
+            className="p-2 bg-gray-100 rounded"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             disabled={page >= totalPages}
-            onClick={() => setPage(page + 1)}
-            className="p-2 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer hover:bg-gray-200 transition"
+            onClick={() => setPage((p) => p + 1)}
+            className="p-2 bg-gray-100 rounded"
           >
             <ChevronRight size={18} />
           </button>
@@ -750,6 +845,14 @@ export default function ClientsPage() {
         setOpen={setLogsOpen}
         clientId={logsClientId}
       />
+      <StatusModal
+        open={statusModalOpen}
+        onClose={() => setStatusModalOpen(false)}
+        action={statusAction}
+        clientName={statusClientName}
+        onConfirm={handleStatusConfirm}
+      />
+      <LoadingOverlay loading={mutating} />
     </div>
   );
 }

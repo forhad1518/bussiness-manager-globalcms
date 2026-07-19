@@ -15,7 +15,7 @@ const clientTransactionSchema = new Schema<IClientTransaction>(
     clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true },
     type: {
       type: String,
-      enum: ["due_added", "payment", "terminated"],
+      enum: ["due_added", "payment", "terminated", "reactivated"],
       required: true,
     },
     amount: { type: Number, default: 0 },

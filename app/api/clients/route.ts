@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/dbConnect";
 import Client from "@/models/Client";
+import Order from "@/models/Order";
 import { getAuthUser } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -13,8 +14,8 @@ export async function GET(req: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "10");
   const search = searchParams.get("search") || "";
-  const status = searchParams.get("status") || ""; // active/terminated
-  const summary = searchParams.get("summary") === "1"; // শুধু কার্ডের জন্য
+  const status = searchParams.get("status") || "";
+  const summary = searchParams.get("summary") === "1";
 
   const filter: any = {};
   if (status && (status === "active" || status === "terminated")) {
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (summary) {
-    // কার্ড সামারি
+    // existing summary
     const totalClients = await Client.countDocuments();
     const nonPaidClients = await Client.countDocuments({
       dueAmount: { $gt: 0 },
@@ -44,7 +45,6 @@ export async function GET(req: NextRequest) {
       { $group: { _id: null, total: { $sum: "$dueAmount" } } },
     ]);
     const totalDue = totalDueAgg.length > 0 ? totalDueAgg[0].total : 0;
-
     return NextResponse.json({
       totalClients,
       nonPaidClients,
@@ -59,10 +59,53 @@ export async function GET(req: NextRequest) {
   const clients = await Client.find(filter)
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean();
+
+  // প্রতিটি ক্লায়েন্টের জন্য মোট কাজ (totalWork) ও প্রফিট (profit) বের করি
+  const clientIds = clients.map((c) => c._id);
+  const ordersAgg = await Order.aggregate([
+    { $match: { clientId: { $in: clientIds }, status: { $ne: "cancel" } } },
+    {
+      $group: {
+        _id: "$clientId",
+        totalWork: {
+          $sum: { $add: ["$amount", { $sum: "$increases.amount" }] },
+        },
+        profit: {
+          $sum: {
+            $cond: [
+              { $eq: ["$status", "successful"] },
+              {
+                $subtract: [
+                  { $add: ["$amount", { $sum: "$increases.amount" }] },
+                  { $ifNull: ["$successData.expense", 0] },
+                ],
+              },
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  const orderMap: Record<string, { totalWork: number; profit: number }> = {};
+  ordersAgg.forEach((item: any) => {
+    orderMap[item._id.toString()] = {
+      totalWork: item.totalWork || 0,
+      profit: item.profit || 0,
+    };
+  });
+
+  const clientsWithStats = clients.map((client) => ({
+    ...client,
+    totalWork: orderMap[client._id.toString()]?.totalWork ?? 0,
+    profit: orderMap[client._id.toString()]?.profit ?? 0,
+  }));
 
   return NextResponse.json({
-    clients,
+    clients: clientsWithStats,
     pagination: {
       page,
       limit,
@@ -71,6 +114,8 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+
+// POST অপরিবর্তিত
 
 export async function POST(req: NextRequest) {
   await dbConnect();

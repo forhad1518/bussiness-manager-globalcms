@@ -9,10 +9,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      <Sidebar
+        open={sidebarOpen}
+        setOpen={setSidebarOpen}
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar setSidebarOpen={setSidebarOpen} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>

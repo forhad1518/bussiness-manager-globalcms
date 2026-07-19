@@ -594,16 +594,20 @@ function ViewLogsModal({
   );
 }
 
-// ---------- EditDrawer (full functionality) ----------
+// ---------- EditDrawer with realtime update ----------
 function EditDrawer({
   open,
   setOpen,
   order,
+  setOrders,
+  setSelectedOrder,
   refresh,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
   order: Order | null;
+  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+  setSelectedOrder: React.Dispatch<React.SetStateAction<Order | null>>;
   refresh: () => void;
 }) {
   if (!order) return null;
@@ -638,16 +642,28 @@ function EditDrawer({
     if (!incAmount) return;
     setSaving(true);
     try {
-      await axios.post(`/api/orders/${order._id}/increase`, {
+      const res = await axios.post(`/api/orders/${order._id}/increase`, {
         amount: parseFloat(incAmount),
         cause: incCause,
         description: incDesc,
       });
       toast.success("Increase added");
+      // locally update order
+      const newIncrease = res.data; // depends on API response, assuming it returns the increase subdoc
+      setOrders((prev: Order[]) =>
+        prev.map((o: Order) =>
+          o._id === order._id
+            ? { ...o, increases: [...o.increases, newIncrease] }
+            : o,
+        ),
+      );
+      // update selected order for drawer display
+      setSelectedOrder((prev: Order | null) =>
+        prev ? { ...prev, increases: [...prev.increases, newIncrease] } : prev,
+      );
       setIncAmount("");
       setIncCause("");
       setIncDesc("");
-      refresh();
     } catch {
       toast.error("Failed");
     } finally {
@@ -659,16 +675,28 @@ function EditDrawer({
     if (!repAmount || !repMethod) return;
     setSaving(true);
     try {
-      await axios.post(`/api/orders/${order._id}/repayment`, {
+      const res = await axios.post(`/api/orders/${order._id}/repayment`, {
         amount: parseFloat(repAmount),
         method: repMethod,
         description: repDesc,
       });
       toast.success("Repayment added");
+      const newRepayment = res.data;
+      setOrders((prev: Order[]) =>
+        prev.map((o: Order) =>
+          o._id === order._id
+            ? { ...o, repayments: [...o.repayments, newRepayment] }
+            : o,
+        ),
+      );
+      setSelectedOrder((prev: Order | null) =>
+        prev
+          ? { ...prev, repayments: [...prev.repayments, newRepayment] }
+          : prev,
+      );
       setRepAmount("");
       setRepMethod("cash");
       setRepDesc("");
-      refresh();
     } catch {
       toast.error("Failed");
     } finally {
@@ -911,8 +939,14 @@ export default function OrdersContent() {
   }, [fetchOrders]);
 
   const dueAmount = (order: Order) => {
-    const totalInc = order.increases.reduce((s, i) => s + i.amount, 0);
-    const totalRep = order.repayments.reduce((s, r) => s + r.amount, 0);
+    const totalInc = order.increases.reduce(
+      (s: number, i: any) => s + i.amount,
+      0,
+    );
+    const totalRep = order.repayments.reduce(
+      (s: number, r: any) => s + r.amount,
+      0,
+    );
     return order.amount + totalInc - (order.payAmount + totalRep);
   };
 
@@ -1147,6 +1181,8 @@ export default function OrdersContent() {
         open={editDrawer}
         setOpen={setEditDrawer}
         order={selectedOrder}
+        setOrders={setOrders}
+        setSelectedOrder={setSelectedOrder}
         refresh={fetchOrders}
       />
       <StatusDialog

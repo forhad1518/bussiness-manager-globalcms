@@ -24,9 +24,13 @@ export default function TopBar({
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, [fetchNotifications]);
+  const handleBellClick = async () => {
+    setShowDropdown(!showDropdown);
+    if (!showDropdown) {
+      await fetchNotifications();
+    }
+  };
 
   const handleMarkRead = async (
     id: string,
@@ -66,7 +70,7 @@ export default function TopBar({
       <div className="flex items-center gap-4">
         <div className="relative">
           <button
-            onClick={() => setShowDropdown(!showDropdown)}
+            onClick={handleBellClick}
             className="relative p-1 rounded-full hover:bg-gray-100"
           >
             <Bell size={20} />

@@ -4,6 +4,7 @@ import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { Fade } from "react-awesome-reveal";
 import toast from "react-hot-toast";
+import SavingsTypesSection from "@/components/settings/SavingsTypesSection";
 import {
   Save,
   Plus,
@@ -16,6 +17,7 @@ import {
   Key,
   Edit,
   RotateCcw,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -932,6 +934,7 @@ function ChangePassword() {
 const tabs = [
   { key: "print", label: "Print Heading", icon: Save },
   { key: "cash", label: "Cash Categories", icon: Trash2 },
+  { key: "savings", label: "Savings Types", icon: DollarSign }, // নতুন
   { key: "orders", label: "Order Options", icon: GripVertical },
   { key: "users", label: "Users", icon: UserPlus },
   { key: "password", label: "Password", icon: Key },
@@ -990,6 +993,7 @@ export default function SettingsPage() {
           {activeTab === "orders" && <OrderOptionsSection />}
           {activeTab === "users" && <UserManagement />}
           {activeTab === "password" && <ChangePassword />}
+          {activeTab === "savings" && <SavingsTypesSection />}
         </motion.div>
       </AnimatePresence>
     </div>

@@ -4,52 +4,98 @@ import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { Fade } from "react-awesome-reveal";
 import toast from "react-hot-toast";
+import { format } from "date-fns";
 import {
   Plus,
   Search,
-  X,
   ChevronLeft,
   ChevronRight,
   Pencil,
   Trash2,
+  DollarSign,
 } from "lucide-react";
-import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { CardSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
+import Drawer from "@/components/ui/Drawer";
+import FormField from "@/components/ui/FormField";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
+
+// ---------- Types ----------
+interface CashCategory {
+  _id: string;
+  name: string;
+}
 
 interface CashTransaction {
   _id: string;
-  categoryId: { _id: string; name: string };
+  categoryId: { _id: string; name: string } | null;
   amount: number;
   description: string;
   user: { name: string };
   createdAt: string;
 }
 
-interface Category {
+interface SavingsType {
   _id: string;
   name: string;
+  balance: number;
 }
 
 export default function CashOutPage() {
+  // Data states
   const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  // UI states
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editModal, setEditModal] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<CashTransaction | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Filters
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [category, setCategory] = useState("");
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
 
-  const [profitAmount, setProfitAmount] = useState(0);
+  // Data for dropdowns & balances
+  const [categories, setCategories] = useState<CashCategory[]>([]);
+  const [savingsTypes, setSavingsTypes] = useState<SavingsType[]>([]);
+
+  // Balances
   const [todayInAmount, setTodayInAmount] = useState(0);
-  const [totalInAmount, setTotalInAmount] = useState(0);
   const [todayOutAmount, setTodayOutAmount] = useState(0);
+  const [totalInAmount, setTotalInAmount] = useState(0);
   const [totalOutAmount, setTotalOutAmount] = useState(0);
+  const [profitAmount, setProfitAmount] = useState(0);
 
+  // Global loading overlay for mutations
+  const [mutating, setMutating] = useState(false);
+
+  // Source selection for Cash Out
+  const [sourceType, setSourceType] = useState<string>("lastCash"); // "lastCash" or savingsType._id
+
+  // Derived last cash
+  const lastCash = totalInAmount - totalOutAmount;
+
+  // 1 hour delete check
+  const canDelete = (txn: CashTransaction) => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    return new Date(txn.createdAt) > oneHourAgo;
+  };
+
+  // Get available balance for selected source
+  const getAvailableBalance = (): number => {
+    if (sourceType === "lastCash") return lastCash;
+    const st = savingsTypes.find((s) => s._id === sourceType);
+    return st ? st.balance : 0;
+  };
+
+  // ---------- Fetch Functions ----------
   const fetchCategories = useCallback(async () => {
     try {
       const res = await axios.get("/api/cash-categories?type=out");
@@ -57,142 +103,146 @@ export default function CashOutPage() {
     } catch {}
   }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchSavingsTypes = useCallback(async () => {
+    try {
+      const res = await axios.get("/api/savings-types");
+      setSavingsTypes(res.data);
+    } catch {}
+  }, []);
+
+  const fetchBalances = useCallback(async () => {
+    try {
+      const [inSummary, outSummary, profitRes] = await Promise.all([
+        axios.get("/api/cash?type=in&summary=1"),
+        axios.get("/api/cash?type=out&summary=1"),
+        axios.get("/api/orders/profit"),
+      ]);
+      setTodayInAmount(inSummary.data.todayTotal);
+      setTotalInAmount(inSummary.data.allTimeTotal);
+      setTodayOutAmount(outSummary.data.todayTotal);
+      setTotalOutAmount(outSummary.data.allTimeTotal);
+      setProfitAmount(profitRes.data.profit ?? 0);
+    } catch {}
+  }, []);
+
+  const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
       const params: any = { page, limit: 10, type: "out" };
       if (search) params.search = search;
       if (from) params.from = from;
       if (to) params.to = to;
-      if (category) params.category = category;
+      if (categoryFilter) params.category = categoryFilter;
 
-      const [listRes, inSummary, outSummary, profitRes] = await Promise.all([
-        axios.get("/api/cash", { params }),
-        axios.get("/api/cash?type=in&summary=1"),
-        axios.get("/api/cash?type=out&summary=1"),
-        axios.get("/api/orders/profit"),
-      ]);
-
-      setTransactions(listRes.data.transactions);
-      setTotalPages(listRes.data.pagination.totalPages);
-      setTodayInAmount(inSummary.data.todayTotal);
-      setTotalInAmount(inSummary.data.allTimeTotal);
-      setTodayOutAmount(outSummary.data.todayTotal);
-      setTotalOutAmount(outSummary.data.allTimeTotal);
-      setProfitAmount(profitRes.data.profit ?? 0);
+      const res = await axios.get("/api/cash", { params });
+      setTransactions(res.data.transactions);
+      setTotalPages(res.data.pagination.totalPages);
     } catch {
-      toast.error("Failed to fetch data");
+      toast.error("Failed to load data");
     } finally {
       setLoading(false);
     }
-  }, [page, search, from, to, category]);
+  }, [page, search, from, to, categoryFilter]);
 
+  // Initial loads
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchSavingsTypes();
+    fetchBalances();
+  }, [fetchCategories, fetchSavingsTypes, fetchBalances]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchTransactions();
+  }, [fetchTransactions]);
 
-  const totalAmount = profitAmount + totalInAmount;
-
+  // ---------- Handlers ----------
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete?")) return;
+    setMutating(true);
     try {
       await axios.delete(`/api/cash/${id}`);
       toast.success("Deleted");
-      fetchData();
+      fetchTransactions();
+      fetchBalances();
     } catch {
       toast.error("Delete failed");
+    } finally {
+      setMutating(false);
     }
   };
 
-  const EditModal = ({ open, setOpen, txn, refresh }: any) => {
-    const [form, setForm] = useState({ amount: "", description: "" });
-    useEffect(() => {
-      if (txn)
-        setForm({
-          amount: txn.amount.toString(),
-          description: txn.description,
-        });
-    }, [txn]);
+  const handleEdit = (txn: CashTransaction) => {
+    setSelectedTxn(txn);
+    setEditModalOpen(true);
+  };
 
-    const handleUpdate = async () => {
-      try {
-        await axios.put(`/api/cash/${txn._id}`, {
-          amount: parseFloat(form.amount),
-          description: form.description,
+  const handleEditSave = async (amount: number, description: string) => {
+    if (!selectedTxn) return;
+    setMutating(true);
+    try {
+      await axios.put(`/api/cash/${selectedTxn._id}`, { amount, description });
+      toast.success("Updated");
+      setEditModalOpen(false);
+      fetchTransactions();
+      fetchBalances();
+    } catch {
+      toast.error("Update failed");
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const handleAddCashOut = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = new FormData(e.target as HTMLFormElement);
+    const categoryId = form.get("categoryId") as string;
+    const amount = parseFloat(form.get("amount") as string);
+    const description = form.get("description") as string;
+
+    if (!categoryId || !amount || amount <= 0) {
+      toast.error("Category and amount required");
+      return;
+    }
+
+    const available = getAvailableBalance();
+    if (amount > available) {
+      toast.error(`Insufficient balance. Available: ৳${available}`);
+      return;
+    }
+
+    setMutating(true);
+    try {
+      if (sourceType === "lastCash") {
+        // Regular cash out from last cash
+        await axios.post("/api/cash", {
+          type: "out",
+          categoryId,
+          amount,
+          description,
         });
-        toast.success("Updated");
-        setOpen(false);
-        refresh();
-      } catch {
-        toast.error("Update failed");
+      } else {
+        // Withdraw from savings
+        await axios.post("/api/savings", {
+          savingsTypeId: sourceType,
+          type: "withdraw",
+          amount,
+          description: description || "",
+        });
       }
-    };
-
-    return (
-      <AnimatePresence>
-        {open && txn && (
-          <>
-            <motion.div
-              className="fixed inset-0 bg-black/50 z-40"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-            />
-            <motion.div
-              className="fixed inset-0 flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.9 }}
-              >
-                <h3 className="text-lg font-semibold mb-4">Edit</h3>
-                <input
-                  type="number"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg mb-3"
-                />
-                <textarea
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg mb-4"
-                />
-                <div className="flex gap-2 justify-end">
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="px-4 py-2 bg-gray-200 rounded-lg cursor-pointer hover:bg-gray-300 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleUpdate}
-                    className="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-dark transition"
-                  >
-                    Save
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    );
+      toast.success("Cash Out added");
+      setDrawerOpen(false);
+      fetchTransactions();
+      fetchBalances();
+      fetchSavingsTypes(); // refresh savings balances
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed");
+    } finally {
+      setMutating(false);
+    }
   };
 
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">Cash Out</h2>
         <button
@@ -203,6 +253,7 @@ export default function CashOutPage() {
         </button>
       </div>
 
+      {/* Cards */}
       {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -221,8 +272,8 @@ export default function CashOutPage() {
               <p className="text-2xl font-bold">৳ {todayInAmount}</p>
             </div>
             <div className="bg-purple-500 text-white p-4 rounded-xl shadow">
-              <p className="text-sm">Total Amount</p>
-              <p className="text-2xl font-bold">৳ {totalAmount}</p>
+              <p className="text-sm">Last Cash</p>
+              <p className="text-2xl font-bold">৳ {lastCash}</p>
             </div>
             <div className="bg-red-500 text-white p-4 rounded-xl shadow">
               <p className="text-sm">Total Out</p>
@@ -236,6 +287,7 @@ export default function CashOutPage() {
         </Fade>
       )}
 
+      {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-50">
           <Search
@@ -266,9 +318,9 @@ export default function CashOutPage() {
           className="px-3 py-2 border rounded-lg cursor-pointer"
         />
         <select
-          value={category}
+          value={categoryFilter}
           onChange={(e) => {
-            setCategory(e.target.value);
+            setCategoryFilter(e.target.value);
             setPage(1);
           }}
           className="px-3 py-2 border rounded-lg cursor-pointer"
@@ -282,6 +334,7 @@ export default function CashOutPage() {
         </select>
       </div>
 
+      {/* Table or Skeleton */}
       {loading ? (
         <TableSkeleton rows={4} cols={6} />
       ) : (
@@ -307,7 +360,9 @@ export default function CashOutPage() {
                     <td className="p-3">
                       {format(new Date(txn.createdAt), "dd/MM/yyyy HH:mm")}
                     </td>
-                    <td className="p-3">{txn.categoryId?.name || "-"}</td>
+                    <td className="p-3">
+                      {txn.categoryId?.name || "Withdraw"}
+                    </td>
                     <td className="p-3 font-semibold text-red-600">
                       ৳ {txn.amount}
                     </td>
@@ -317,20 +372,22 @@ export default function CashOutPage() {
                     <td className="p-3">{txn.user?.name || "-"}</td>
                     <td className="p-3 flex gap-2">
                       <button
-                        onClick={() => {
-                          setSelectedTxn(txn);
-                          setEditModal(true);
-                        }}
+                        onClick={() => handleEdit(txn)}
                         className="text-blue-600 hover:text-blue-800 cursor-pointer"
                       >
                         <Pencil size={16} />
                       </button>
-                      <button
-                        onClick={() => handleDelete(txn._id)}
-                        className="text-red-600 hover:text-red-800 cursor-pointer"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {canDelete(txn) && (
+                        <button
+                          onClick={() => {
+                            setDeleteId(txn._id);
+                            setDeleteModalOpen(true);
+                          }}
+                          className="text-red-600 hover:text-red-800 cursor-pointer"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -340,6 +397,7 @@ export default function CashOutPage() {
         </Fade>
       )}
 
+      {/* Pagination */}
       <div className="flex items-center justify-between mt-4">
         <span className="text-sm text-gray-600">
           Page {page} of {totalPages}
@@ -362,70 +420,111 @@ export default function CashOutPage() {
         </div>
       </div>
 
-      <AddCashDrawer
+      {/* Add Drawer */}
+      <Drawer
         open={drawerOpen}
-        setOpen={setDrawerOpen}
-        refresh={fetchData}
-        type="out"
-      />
+        onClose={() => setDrawerOpen(false)}
+        title="Cash Out"
+      >
+        <form onSubmit={handleAddCashOut} className="space-y-4">
+          <FormField label="From">
+            <select
+              value={sourceType}
+              onChange={(e) => setSourceType(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg cursor-pointer"
+            >
+              <option value="lastCash">Last Cash (৳ {lastCash})</option>
+              {savingsTypes.map((st) => (
+                <option key={st._id} value={st._id}>
+                  {st.name} (৳ {st.balance})
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Category">
+            <select
+              name="categoryId"
+              className="w-full px-3 py-2 border rounded-lg cursor-pointer"
+              required
+            >
+              <option value="">Select Category</option>
+              {categories.map((cat) => (
+                <option key={cat._id} value={cat._id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Amount">
+            <input
+              name="amount"
+              type="number"
+              className="w-full px-3 py-2 border rounded-lg"
+              required
+            />
+          </FormField>
+          <FormField label="Description">
+            <textarea
+              name="description"
+              className="w-full px-3 py-2 border rounded-lg"
+              rows={3}
+            />
+          </FormField>
+          <button
+            type="submit"
+            className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition cursor-pointer"
+          >
+            Add Cash Out
+          </button>
+        </form>
+      </Drawer>
+
+      {/* Edit Modal */}
       <EditModal
-        open={editModal}
-        setOpen={setEditModal}
-        txn={selectedTxn}
-        refresh={fetchData}
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        transaction={selectedTxn}
+        onSave={handleEditSave}
       />
+
+      {/* Delete Confirm */}
+      <ConfirmModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Delete Transaction"
+        message="Are you sure you want to delete this transaction?"
+        onConfirm={() => {
+          if (deleteId) handleDelete(deleteId);
+          setDeleteModalOpen(false);
+        }}
+      />
+
+      <LoadingOverlay loading={mutating} message="Processing..." />
     </div>
   );
 }
 
-// ---------- AddCashDrawer (repeated for completeness) ----------
-function AddCashDrawer({
+// ---------- Edit Modal Component ----------
+function EditModal({
   open,
-  setOpen,
-  refresh,
-  type,
+  onClose,
+  transaction,
+  onSave,
 }: {
   open: boolean;
-  setOpen: (v: boolean) => void;
-  refresh: () => void;
-  type: "in" | "out";
+  onClose: () => void;
+  transaction: CashTransaction | null;
+  onSave: (amount: number, desc: string) => void;
 }) {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [form, setForm] = useState({
-    categoryId: "",
-    amount: "",
-    description: "",
-  });
+  const [amount, setAmount] = useState("");
+  const [desc, setDesc] = useState("");
 
   useEffect(() => {
-    if (open) {
-      axios
-        .get(`/api/cash-categories?type=${type}`)
-        .then((res) => setCategories(res.data));
+    if (transaction) {
+      setAmount(transaction.amount.toString());
+      setDesc(transaction.description || "");
     }
-  }, [open, type]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.categoryId || !form.amount) {
-      toast.error("Category and amount required");
-      return;
-    }
-    try {
-      await axios.post("/api/cash", {
-        type,
-        categoryId: form.categoryId,
-        amount: parseFloat(form.amount),
-        description: form.description,
-      });
-      toast.success(`Cash ${type === "in" ? "In" : "Out"} added`);
-      setForm({ categoryId: "", amount: "", description: "" });
-      setOpen(false);
-      refresh();
-    } catch {
-      toast.error("Failed to add");
-    }
-  };
+  }, [transaction]);
 
   return (
     <AnimatePresence>
@@ -436,66 +535,52 @@ function AddCashDrawer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setOpen(false)}
+            onClick={onClose}
           />
           <motion.div
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-white z-50 shadow-2xl p-6 overflow-y-auto"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">
-                Add Cash {type === "in" ? "In" : "Out"}
-              </h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="hover:bg-gray-100 p-1 rounded"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <select
-                value={form.categoryId}
-                onChange={(e) =>
-                  setForm({ ...form, categoryId: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg cursor-pointer"
-                required
-              >
-                <option value="">Select Category</option>
-                {categories.map((cat) => (
-                  <option key={cat._id} value={cat._id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Amount"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg"
-                required
-              />
-              <textarea
-                placeholder="Description"
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg"
-                rows={3}
-              />
-              <button
-                type="submit"
-                className="w-full bg-primary text-on-primary py-2.5 rounded-lg hover:bg-primary-dark transition cursor-pointer"
-              >
-                Add
-              </button>
-            </form>
+            <motion.div
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+            >
+              <h3 className="text-lg font-semibold mb-4">Edit Transaction</h3>
+              <FormField label="Amount">
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </FormField>
+              <FormField label="Description">
+                <textarea
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  rows={2}
+                />
+              </FormField>
+              <div className="flex gap-2 justify-end mt-4">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-gray-200 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => onSave(Number(amount), desc)}
+                  className="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         </>
       )}
