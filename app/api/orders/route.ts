@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/dbConnect";
 import Order from "@/models/Order";
+import OrderOption from "@/models/OrderOption";
 import Client from "@/models/Client";
 import { getAuthUser } from "@/lib/auth";
+
+// OrderOption মডেল নিবন্ধন নিশ্চিত করতে
+void OrderOption;
 
 export async function GET(req: NextRequest) {
   await dbConnect();

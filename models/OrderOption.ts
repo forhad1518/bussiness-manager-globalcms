@@ -20,4 +20,5 @@ const orderOptionSchema = new Schema<IOrderOption>(
 const OrderOption: Model<IOrderOption> =
   mongoose.models.OrderOption ||
   mongoose.model<IOrderOption>("OrderOption", orderOptionSchema);
+
 export default OrderOption;
